@@ -1,0 +1,23 @@
+-- 1.md --
+***x*y*z
+-- 1.html --
+<p>*<em><em>x</em>y</em>z</p>
+-- 2.md --
+**x*y
+-- 2.html --
+<p>**x*y</p>
+-- 3.md --
+   > quote
+extra
+-- 3.html --
+<blockquote>
+<p>quote
+extra</p>
+</blockquote>
+-- 4.md --
+    > quote
+extra
+-- 4.html --
+<pre><code>&gt; quote
+</code></pre>
+<p>extra</p>
