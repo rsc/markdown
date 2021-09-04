@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build ignore
 // +build ignore
 
 package main
@@ -15,10 +16,6 @@ import (
 	"sort"
 	"strings"
 )
-
-type entityList map[string]struct {
-	Codepoints []int
-}
 
 func main() {
 	resp, err := http.Get("https://html.spec.whatwg.org/entities.json")

@@ -1,0 +1,2 @@
+go test fuzz v1
+string("![foo](/\x10rl \"title%(/url \"titlU%(/url \"\")\n")

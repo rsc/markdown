@@ -5,12 +5,19 @@
 package markdown
 
 import (
+	"bytes"
+	"flag"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/yuin/goldmark"
+	ghtml "github.com/yuin/goldmark/renderer/html"
 	"golang.org/x/tools/txtar"
 )
+
+var goldmarkFlag = flag.Bool("goldmark", false, "run goldmark tests")
 
 func Test(t *testing.T) {
 	files, err := filepath.Glob("testdata/*.txt")
@@ -35,12 +42,39 @@ func Test(t *testing.T) {
 				}
 
 				t.Run(name, func(t *testing.T) {
-					p := parse(decode(string(md.Data)))
-					h := encode(toHTML(p))
+					doc := parse(decode(string(md.Data)))
+					h := encode(toHTML(doc))
 					if h != string(html.Data) {
-						t.Fatalf("input %q\nparse:\n%s\nhave %q\nwant %q", md.Data, dump(p), h, html.Data)
+						t.Fatalf("input %q\nparse:\n%s\nhave %q\nwant %q\ndingus: (https://spec.commonmark.org/dingus/?text=%s)", md.Data, dump(doc), h, html.Data, strings.ReplaceAll(url.QueryEscape(decode(string(md.Data))), "+", "%20"))
 					}
 					npass++
+				})
+
+				if !*goldmarkFlag {
+					continue
+				}
+				t.Run("goldmark/"+name, func(t *testing.T) {
+					gm := goldmark.New(
+						goldmark.WithRendererOptions(
+							ghtml.WithUnsafe(),
+						),
+					)
+					var buf bytes.Buffer
+					if err := gm.Convert([]byte(decode(string(md.Data))), &buf); err != nil {
+						t.Fatal(err)
+					}
+					if buf.Len() > 0 && buf.Bytes()[buf.Len()-1] != '\n' {
+						buf.WriteByte('\n')
+					}
+					want := string(html.Data)
+					want = strings.ReplaceAll(want, " />", ">")
+					out := encode(buf.String())
+					out = strings.ReplaceAll(out, " />", ">")
+					if out != want {
+						t.Fatalf("\n    - input: ``%q``\n    - output: ``%q``\n    - golden: ``%q``\n    - [dingus](https://spec.commonmark.org/dingus/?text=%s)", md.Data, out, want, strings.ReplaceAll(url.QueryEscape(decode(string(md.Data))), "+", "%20"))
+					}
+					npass++
+
 				})
 			}
 			t.Logf("%d/%d pass", npass, ncase)
@@ -50,8 +84,9 @@ func Test(t *testing.T) {
 
 func decode(s string) string {
 	s = strings.ReplaceAll(s, "^J\n", "\n")
-	s = strings.ReplaceAll(s, "^M\n", "\r\n")
+	s = strings.ReplaceAll(s, "^M", "\r")
 	s = strings.ReplaceAll(s, "^D\n", "")
+	s = strings.ReplaceAll(s, "^@", "\x00")
 	return s
 }
 
@@ -60,6 +95,7 @@ func encode(s string) string {
 	s = strings.ReplaceAll(s, "\r", "^M^D\n")
 	s = strings.ReplaceAll(s, " \n", " ^J\n")
 	s = strings.ReplaceAll(s, "\t\n", "\t^J\n")
+	s = strings.ReplaceAll(s, "\x00", "^@")
 	if s != "" && !strings.HasSuffix(s, "\n") {
 		s += "^D\n"
 	}

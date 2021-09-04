@@ -1,0 +1,2 @@
+go test fuzz v1
+string("![([foo]![([oo][i.)](u.\u007ffoo][i1)](u1.)](uri3)\n")

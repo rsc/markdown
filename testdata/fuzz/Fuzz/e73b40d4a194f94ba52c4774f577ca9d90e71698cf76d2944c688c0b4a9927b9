@@ -1,0 +1,2 @@
+go test fuzz v1
+string("1. a\n\n  \x05\x05\x05\x05\x052n b\n\n   3. c\n")
