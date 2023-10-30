@@ -137,7 +137,7 @@ func (p *parser) Pos() Position {
 	return b.pos
 }
 
-func parse(text string) Block {
+func Parse(text string) Block {
 	text = strings.ReplaceAll(text, "\x00", "\uFFFD")
 	var p parser
 	p.lineDepth = -1
@@ -395,7 +395,7 @@ func (s *Line) trimString() string {
 	return strings.Trim(s.text[s.i:], " \t")
 }
 
-func toHTML(b Block) string {
+func ToHTML(b Block) string {
 	var buf bytes.Buffer
 	b.PrintHTML(&buf)
 	return buf.String()

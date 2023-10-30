@@ -42,8 +42,8 @@ func Test(t *testing.T) {
 				}
 
 				t.Run(name, func(t *testing.T) {
-					doc := parse(decode(string(md.Data)))
-					h := encode(toHTML(doc))
+					doc := Parse(decode(string(md.Data)))
+					h := encode(ToHTML(doc))
 					if h != string(html.Data) {
 						t.Fatalf("input %q\nparse:\n%s\nhave %q\nwant %q\ndingus: (https://spec.commonmark.org/dingus/?text=%s)", md.Data, dump(doc), h, html.Data, strings.ReplaceAll(url.QueryEscape(decode(string(md.Data))), "+", "%20"))
 					}
