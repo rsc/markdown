@@ -19,7 +19,7 @@ func (b *Quote) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("</blockquote>\n")
 }
 
-func trimQuote(s Line) (Line, bool) {
+func trimQuote(s line) (line, bool) {
 	t := s
 	t.trimSpace(0, 3, false)
 	if !t.trim('>') {
@@ -31,18 +31,18 @@ func trimQuote(s Line) (Line, bool) {
 
 type quoteBuilder struct{}
 
-func newQuote(p *parser, line Line) (Line, bool) {
-	if line, ok := trimQuote(line); ok {
+func newQuote(p *parser, s line) (line, bool) {
+	if line, ok := trimQuote(s); ok {
 		p.addBlock(new(quoteBuilder))
 		return line, true
 	}
-	return line, false
+	return s, false
 }
 
-func (b *quoteBuilder) Extend(p *parser, line Line) (Line, bool) {
-	return trimQuote(line)
+func (b *quoteBuilder) extend(p *parser, s line) (line, bool) {
+	return trimQuote(s)
 }
 
-func (b *quoteBuilder) Build(p BuildState) Block {
-	return &Quote{p.Pos(), p.Blocks()}
+func (b *quoteBuilder) build(p buildState) Block {
+	return &Quote{p.pos(), p.blocks()}
 }

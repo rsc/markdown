@@ -30,11 +30,11 @@ type paraBuilder struct {
 	text []string
 }
 
-func (c *paraBuilder) Extend(p *parser, line Line) (Line, bool) {
-	return line, false
+func (c *paraBuilder) extend(p *parser, s line) (line, bool) {
+	return s, false
 }
 
-func (b *paraBuilder) Build(p BuildState) Block {
+func (b *paraBuilder) build(p buildState) Block {
 	s := strings.Join(b.text, "\n")
 	for s != "" {
 		end, ok := parseLinkRefDef(p, s)
@@ -45,16 +45,16 @@ func (b *paraBuilder) Build(p BuildState) Block {
 	}
 
 	if s == "" {
-		return &Empty{p.Pos()}
+		return &Empty{p.pos()}
 	}
 
 	return &Paragraph{
-		p.Pos(),
-		p.NewText(p.Pos(), s),
+		p.pos(),
+		p.newText(p.pos(), s),
 	}
 }
 
-func newPara(p *parser, line Line) (Line, bool) {
+func newPara(p *parser, s line) (line, bool) {
 	// Process paragraph continuation text or start new paragraph.
 	b := p.para()
 	if b != nil {
@@ -66,6 +66,6 @@ func newPara(p *parser, line Line) (Line, bool) {
 		b = new(paraBuilder)
 		p.addBlock(b)
 	}
-	b.text = append(b.text, line.trimSpaceString())
-	return Line{}, true
+	b.text = append(b.text, s.trimSpaceString())
+	return line{}, true
 }

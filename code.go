@@ -38,29 +38,29 @@ func (b *CodeBlock) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("</code></pre>\n")
 }
 
-func newPre(p *parser, line Line) (Line, bool) {
-	peek2 := line
+func newPre(p *parser, s line) (line, bool) {
+	peek2 := s
 	if p.para() == nil && peek2.trimSpace(4, 4, false) && !peek2.isBlank() {
 		b := &preBuilder{}
 		p.addBlock(b)
 		b.text = append(b.text, peek2.string())
-		return Line{}, true
+		return line{}, true
 	}
-	return line, false
+	return s, false
 }
 
-func newFence(p *parser, line Line) (Line, bool) {
+func newFence(p *parser, s line) (line, bool) {
 	var fence, info string
 	var n int
-	peek := line
+	peek := s
 	if peek.trimFence(&fence, &info, &n) {
 		p.addBlock(&fenceBuilder{fence, info, n, nil})
-		return Line{}, true
+		return line{}, true
 	}
-	return line, false
+	return s, false
 }
 
-func (s *Line) trimFence(fence, info *string, n *int) bool {
+func (s *line) trimFence(fence, info *string, n *int) bool {
 	t := *s
 	*n = 0
 	for *n < 3 && t.trimSpace(1, 1, false) {
@@ -90,7 +90,7 @@ func (s *Line) trimFence(fence, info *string, n *int) bool {
 		*info = txt
 
 		*fence = f[:n]
-		*s = Line{}
+		*s = line{}
 		return true
 	}
 	return false
@@ -100,16 +100,16 @@ type preBuilder struct {
 	text []string
 }
 
-func (c *preBuilder) Extend(p *parser, line Line) (Line, bool) {
-	if !line.trimSpace(4, 4, true) {
-		return line, false
+func (c *preBuilder) extend(p *parser, s line) (line, bool) {
+	if !s.trimSpace(4, 4, true) {
+		return s, false
 	}
-	c.text = append(c.text, line.string())
-	return Line{}, true
+	c.text = append(c.text, s.string())
+	return line{}, true
 }
 
-func (b *preBuilder) Build(p BuildState) Block {
-	return &CodeBlock{p.Pos(), "", "", b.text}
+func (b *preBuilder) build(p buildState) Block {
+	return &CodeBlock{p.pos(), "", "", b.text}
 }
 
 type fenceBuilder struct {
@@ -119,20 +119,20 @@ type fenceBuilder struct {
 	text  []string
 }
 
-func (c *fenceBuilder) Extend(p *parser, line Line) (Line, bool) {
+func (c *fenceBuilder) extend(p *parser, s line) (line, bool) {
 	var fence, info string
 	var n int
-	if t := line; t.trimFence(&fence, &info, &n) && strings.HasPrefix(fence, c.fence) && info == "" {
-		return Line{}, false
+	if t := s; t.trimFence(&fence, &info, &n) && strings.HasPrefix(fence, c.fence) && info == "" {
+		return line{}, false
 	}
-	line.trimSpace(0, c.n, false)
-	c.text = append(c.text, line.string())
-	return Line{}, true
+	s.trimSpace(0, c.n, false)
+	c.text = append(c.text, s.string())
+	return line{}, true
 }
 
-func (c *fenceBuilder) Build(p BuildState) Block {
+func (c *fenceBuilder) build(p buildState) Block {
 	return &CodeBlock{
-		p.Pos(),
+		p.pos(),
 		c.fence,
 		c.info,
 		c.text,

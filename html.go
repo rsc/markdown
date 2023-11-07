@@ -29,34 +29,34 @@ type htmlBuilder struct {
 	endFunc  func(string) bool
 }
 
-func (c *htmlBuilder) Extend(p *parser, line Line) (Line, bool) {
-	if c.endBlank && line.isBlank() {
-		return line, false
+func (c *htmlBuilder) extend(p *parser, s line) (line, bool) {
+	if c.endBlank && s.isBlank() {
+		return s, false
 	}
-	s := line.string()
-	c.text = append(c.text, s)
-	if c.endFunc != nil && c.endFunc(s) {
-		return Line{}, false
+	t := s.string()
+	c.text = append(c.text, t)
+	if c.endFunc != nil && c.endFunc(t) {
+		return line{}, false
 	}
-	return Line{}, true
+	return line{}, true
 }
 
-func (c *htmlBuilder) Build(p BuildState) Block {
+func (c *htmlBuilder) build(p buildState) Block {
 	return &HTMLBlock{
-		p.Pos(),
+		p.pos(),
 		c.text,
 	}
 }
 
-func newHTML(p *parser, line Line) (Line, bool) {
-	peek := line
+func newHTML(p *parser, s line) (line, bool) {
+	peek := s
 	if p.startHTML(&peek) {
-		return Line{}, true
+		return line{}, true
 	}
-	return line, false
+	return s, false
 }
 
-func (p *parser) startHTML(s *Line) bool {
+func (p *parser) startHTML(s *line) bool {
 	tt := *s
 	tt.trimSpace(0, 3, false)
 	if tt.peek() != '<' {

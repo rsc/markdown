@@ -44,24 +44,24 @@ func (p Position) Pos() Position {
 	return p
 }
 
-type BuildState interface {
-	Blocks() []Block
-	Pos() Position
-	Last() Block
-	DeleteLast()
+type buildState interface {
+	blocks() []Block
+	pos() Position
+	last() Block
+	deleteLast()
 
-	Link(label string) *Link
-	DefineLink(label string, link *Link)
-	NewText(pos Position, text string) Block
+	link(label string) *Link
+	defineLink(label string, link *Link)
+	newText(pos Position, text string) Block
 }
 
-type BlockBuilder interface {
-	Extend(p *parser, line Line) (Line, bool)
-	Build(BuildState) Block
+type blockBuilder interface {
+	extend(p *parser, s line) (line, bool)
+	build(buildState) Block
 }
 
 type openBlock struct {
-	builder BlockBuilder
+	builder blockBuilder
 	inner   []Block
 	pos     Position
 }
@@ -72,12 +72,12 @@ type itemBuilder struct {
 	haveContent bool
 }
 
-func (p *parser) Last() Block {
+func (p *parser) last() Block {
 	ob := &p.stack[len(p.stack)-1]
 	return ob.inner[len(ob.inner)-1]
 }
 
-func (p *parser) DeleteLast() {
+func (p *parser) deleteLast() {
 	ob := &p.stack[len(p.stack)-1]
 	ob.inner = ob.inner[:len(ob.inner)-1]
 }
@@ -96,8 +96,8 @@ func (b *Text) PrintHTML(buf *bytes.Buffer) {
 
 type rootBuilder struct{}
 
-func (b *rootBuilder) Build(p BuildState) Block {
-	return &Document{p.Pos(), p.Blocks(), p.(*parser).links}
+func (b *rootBuilder) build(p buildState) Block {
+	return &Document{p.pos(), p.blocks(), p.(*parser).links}
 }
 
 type Document struct {
@@ -121,18 +121,18 @@ type parser struct {
 	texts []*Text
 }
 
-func (p *parser) NewText(pos Position, text string) Block {
+func (p *parser) newText(pos Position, text string) Block {
 	b := &Text{Position: pos, raw: text}
 	p.texts = append(p.texts, b)
 	return b
 }
 
-func (p *parser) Blocks() []Block {
+func (p *parser) blocks() []Block {
 	b := &p.stack[len(p.stack)-1]
 	return b.inner
 }
 
-func (p *parser) Pos() Position {
+func (p *parser) pos() Position {
 	b := &p.stack[len(p.stack)-1]
 	return b.pos
 }
@@ -143,24 +143,24 @@ func Parse(text string) Block {
 	p.lineDepth = -1
 	p.addBlock(&rootBuilder{})
 	for text != "" {
-		var line string
+		var ln string
 		i := strings.Index(text, "\n")
 		j := strings.Index(text, "\r")
 		switch {
 		case j >= 0 && (i < 0 || j < i): // have \r, maybe \r\n
-			line = text[:j]
+			ln = text[:j]
 			if i == j+1 {
 				text = text[j+2:]
 			} else {
 				text = text[j+1:]
 			}
 		case i >= 0:
-			line, text = text[:i], text[i+1:]
+			ln, text = text[:i], text[i+1:]
 		default:
-			line, text = text, ""
+			ln, text = text, ""
 		}
 		p.lineno++
-		p.addLine(Line{text: line})
+		p.addLine(line{text: ln})
 	}
 	p.trimStack(0)
 
@@ -171,14 +171,14 @@ func Parse(text string) Block {
 	return p.root
 }
 
-func (p *parser) curB() BlockBuilder {
+func (p *parser) curB() blockBuilder {
 	if p.lineDepth < len(p.stack) {
 		return p.stack[p.lineDepth].builder
 	}
 	return nil
 }
 
-func (p *parser) nextB() BlockBuilder {
+func (p *parser) nextB() blockBuilder {
 	if p.lineDepth+1 < len(p.stack) {
 		return p.stack[p.lineDepth+1].builder
 	}
@@ -193,7 +193,7 @@ func (p *parser) trimStack(depth int) {
 	}
 }
 
-func (p *parser) addBlock(c BlockBuilder) {
+func (p *parser) addBlock(c blockBuilder) {
 	p.trimStack(p.lineDepth + 1)
 	p.stack = append(p.stack, openBlock{})
 	ob := &p.stack[len(p.stack)-1]
@@ -220,7 +220,7 @@ func (p *parser) closeBlock() Block {
 	if b.builder == nil {
 		println("closeBlock", len(p.stack)-1)
 	}
-	blk := b.builder.Build(p)
+	blk := b.builder.build(p)
 	p.stack = p.stack[:len(p.stack)-1]
 	if len(p.stack) > 0 {
 		b := &p.stack[len(p.stack)-1]
@@ -232,32 +232,32 @@ func (p *parser) closeBlock() Block {
 	return blk
 }
 
-func (p *parser) Link(label string) *Link {
+func (p *parser) link(label string) *Link {
 	return p.links[label]
 }
 
-func (p *parser) DefineLink(label string, link *Link) {
+func (p *parser) defineLink(label string, link *Link) {
 	if p.links == nil {
 		p.links = make(map[string]*Link)
 	}
 	p.links[label] = link
 }
 
-type Line struct {
+type line struct {
 	spaces int
 	i      int
 	tab    int
 	text   string
 }
 
-func (p *parser) addLine(line Line) {
+func (p *parser) addLine(s line) {
 	// Process continued prefixes.
 	p.lineDepth = 0
 	for ; p.lineDepth+1 < len(p.stack); p.lineDepth++ {
-		old := line
+		old := s
 		var ok bool
-		line, ok = p.stack[p.lineDepth+1].builder.Extend(p, line)
-		if !old.isBlank() && (ok || line != old) {
+		s, ok = p.stack[p.lineDepth+1].builder.extend(p, s)
+		if !old.isBlank() && (ok || s != old) {
 			p.stack[p.lineDepth+1].pos.EndLine = p.lineno
 		}
 		if !ok {
@@ -265,7 +265,7 @@ func (p *parser) addLine(line Line) {
 		}
 	}
 
-	if line.isBlank() {
+	if s.isBlank() {
 		p.trimStack(p.lineDepth + 1)
 		return
 	}
@@ -274,9 +274,9 @@ func (p *parser) addLine(line Line) {
 Prefixes:
 	// Start new block inside p.stack[depth].
 	for _, fn := range news {
-		if l, ok := fn(p, line); ok {
-			line = l
-			if line.isBlank() {
+		if l, ok := fn(p, s); ok {
+			s = l
+			if s.isBlank() {
 				return
 			}
 			p.lineDepth++
@@ -284,14 +284,14 @@ Prefixes:
 		}
 	}
 
-	newPara(p, line)
+	newPara(p, s)
 }
 
-func (c *rootBuilder) Extend(p *parser, line Line) (Line, bool) {
+func (c *rootBuilder) extend(p *parser, s line) (line, bool) {
 	panic("root extend")
 }
 
-var news = []func(*parser, Line) (Line, bool){
+var news = []func(*parser, line) (line, bool){
 	newQuote,
 	newATXHeading,
 	newSetextHeading,
@@ -302,7 +302,7 @@ var news = []func(*parser, Line) (Line, bool){
 	newPre,
 }
 
-func (s *Line) peek() byte {
+func (s *line) peek() byte {
 	if s.spaces > 0 {
 		return ' '
 	}
@@ -312,14 +312,14 @@ func (s *Line) peek() byte {
 	return s.text[s.i]
 }
 
-func (s *Line) skipSpace() {
+func (s *line) skipSpace() {
 	s.spaces = 0
 	for s.i < len(s.text) && (s.text[s.i] == ' ' || s.text[s.i] == '\t') {
 		s.i++
 	}
 }
 
-func (s *Line) trimSpace(min, max int, eolOK bool) bool {
+func (s *line) trimSpace(min, max int, eolOK bool) bool {
 	t := *s
 	for n := 0; n < max; n++ {
 		if t.spaces > 0 {
@@ -350,7 +350,7 @@ func (s *Line) trimSpace(min, max int, eolOK bool) bool {
 	return true
 }
 
-func (s *Line) trim(c byte) bool {
+func (s *line) trim(c byte) bool {
 	if s.spaces > 0 {
 		if c == ' ' {
 			s.spaces--
@@ -365,7 +365,7 @@ func (s *Line) trim(c byte) bool {
 	return false
 }
 
-func (s *Line) string() string {
+func (s *line) string() string {
 	switch s.spaces {
 	case 0:
 		return s.text[s.i:]
@@ -379,19 +379,19 @@ func (s *Line) string() string {
 	panic("bad spaces")
 }
 
-func (s *Line) isBlank() bool {
+func (s *line) isBlank() bool {
 	return strings.Trim(s.text[s.i:], " \t") == ""
 }
 
-func (s *Line) eof() bool {
+func (s *line) eof() bool {
 	return s.i >= len(s.text)
 }
 
-func (s *Line) trimSpaceString() string {
+func (s *line) trimSpaceString() string {
 	return strings.TrimLeft(s.text[s.i:], " \t")
 }
 
-func (s *Line) trimString() string {
+func (s *line) trimString() string {
 	return strings.Trim(s.text[s.i:], " \t")
 }
 

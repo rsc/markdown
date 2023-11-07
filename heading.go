@@ -22,8 +22,8 @@ func (b *Heading) PrintHTML(buf *bytes.Buffer) {
 	fmt.Fprintf(buf, "</h%d>\n", b.Level)
 }
 
-func newATXHeading(p *parser, line Line) (Line, bool) {
-	peek := line
+func newATXHeading(p *parser, s line) (line, bool) {
+	peek := s
 	var n int
 	if peek.trimHeading(&n) {
 		s := peek.string()
@@ -32,29 +32,29 @@ func newATXHeading(p *parser, line Line) (Line, bool) {
 			s = t
 		}
 		pos := Position{p.lineno, p.lineno}
-		p.doneBlock(&Heading{pos, n, p.NewText(pos, s)})
-		return Line{}, true
+		p.doneBlock(&Heading{pos, n, p.newText(pos, s)})
+		return line{}, true
 	}
-	return line, false
+	return s, false
 }
 
-func newSetextHeading(p *parser, line Line) (Line, bool) {
+func newSetextHeading(p *parser, s line) (line, bool) {
 	var n int
-	peek := line
+	peek := s
 	if p.nextB() == p.para() && peek.trimSetext(&n) {
 		p.closeBlock()
-		para, ok := p.Last().(*Paragraph)
+		para, ok := p.last().(*Paragraph)
 		if !ok {
-			return line, false
+			return s, false
 		}
-		p.DeleteLast()
+		p.deleteLast()
 		p.doneBlock(&Heading{Position{para.StartLine, p.lineno}, n, para.Text})
-		return Line{}, true
+		return line{}, true
 	}
-	return line, false
+	return s, false
 }
 
-func (s *Line) trimHeading(width *int) bool {
+func (s *line) trimHeading(width *int) bool {
 	t := *s
 	t.trimSpace(0, 3, false)
 	if !t.trim('#') {
@@ -72,7 +72,7 @@ func (s *Line) trimHeading(width *int) bool {
 	return true
 }
 
-func (s *Line) trimSetext(n *int) bool {
+func (s *line) trimSetext(n *int) bool {
 	t := *s
 	t.trimSpace(0, 3, false)
 	c := t.peek()

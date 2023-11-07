@@ -12,7 +12,7 @@ import (
 	"golang.org/x/text/cases"
 )
 
-func parseLinkRefDef(p BuildState, s string) (int, bool) {
+func parseLinkRefDef(p buildState, s string) (int, bool) {
 	// “A link reference definition consists of a link label,
 	// optionally preceded by up to three spaces of indentation,
 	// followed by a colon (:),
@@ -72,8 +72,8 @@ func parseLinkRefDef(p BuildState, s string) (int, bool) {
 	}
 
 	label = normalizeLabel(label)
-	if p.Link(label) == nil {
-		p.DefineLink(label, &Link{URL: dest, Title: title})
+	if p.link(label) == nil {
+		p.defineLink(label, &Link{URL: dest, Title: title})
 	}
 	return i, true
 }

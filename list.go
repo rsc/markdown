@@ -65,12 +65,12 @@ type listBuilder struct {
 	num    int
 	loose  bool
 	item   *itemBuilder
-	todo   func() Line
+	todo   func() line
 }
 
-func (b *listBuilder) Build(p BuildState) Block {
-	blocks := p.Blocks()
-	pos := p.Pos()
+func (b *listBuilder) build(p buildState) Block {
+	blocks := p.blocks()
+	pos := p.pos()
 
 	// list can have wrong pos b/c extend dance.
 	pos.EndLine = blocks[len(blocks)-1].Pos().EndLine
@@ -110,51 +110,51 @@ Loose:
 		b.bullet,
 		b.num,
 		b.loose,
-		p.Blocks(),
+		p.blocks(),
 	}
 }
 
-func (b *itemBuilder) Build(p BuildState) Block {
+func (b *itemBuilder) build(p buildState) Block {
 	b.list.item = nil
-	return &Item{p.Pos(), p.Blocks()}
+	return &Item{p.pos(), p.blocks()}
 }
 
-func (c *listBuilder) Extend(p *parser, line Line) (Line, bool) {
+func (c *listBuilder) extend(p *parser, s line) (line, bool) {
 	d := c.item
-	if d != nil && line.trimSpace(d.width, d.width, true) || d == nil && line.isBlank() {
-		return line, true
+	if d != nil && s.trimSpace(d.width, d.width, true) || d == nil && s.isBlank() {
+		return s, true
 	}
-	return line, false
+	return s, false
 }
 
-func (c *itemBuilder) Extend(p *parser, line Line) (Line, bool) {
-	if line.isBlank() && !c.haveContent {
-		return line, false
+func (c *itemBuilder) extend(p *parser, s line) (line, bool) {
+	if s.isBlank() && !c.haveContent {
+		return s, false
 	}
-	if line.isBlank() {
+	if s.isBlank() {
 		// Goldmark does this and apparently commonmark.js too.
 		// Not sure why it is necessary.
-		return Line{}, true
+		return line{}, true
 	}
-	if !line.isBlank() {
+	if !s.isBlank() {
 		c.haveContent = true
 	}
-	return line, true
+	return s, true
 }
 
-func newListItem(p *parser, line Line) (Line, bool) {
+func newListItem(p *parser, s line) (line, bool) {
 	if list, ok := p.curB().(*listBuilder); ok && list.todo != nil {
-		line = list.todo()
+		s = list.todo()
 		list.todo = nil
-		return line, true
+		return s, true
 	}
-	if p.startListItem(&line) {
-		return line, true
+	if p.startListItem(&s) {
+		return s, true
 	}
-	return line, false
+	return s, false
 }
 
-func (p *parser) startListItem(s *Line) bool {
+func (p *parser) startListItem(s *line) bool {
 	t := *s
 	n := 0
 	for i := 0; i < 3; i++ {
@@ -229,7 +229,7 @@ Switch:
 		p.addBlock(list)
 	}
 	b := &itemBuilder{list: list, width: n, haveContent: !t.isBlank()}
-	list.todo = func() Line {
+	list.todo = func() line {
 		p.addBlock(b)
 		list.item = b
 		return t

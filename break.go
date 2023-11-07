@@ -14,15 +14,15 @@ func (b *ThematicBreak) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("<hr />\n")
 }
 
-func newHR(p *parser, line Line) (Line, bool) {
-	if isHR(line) {
+func newHR(p *parser, s line) (line, bool) {
+	if isHR(s) {
 		p.doneBlock(&ThematicBreak{Position{p.lineno, p.lineno}})
-		return Line{}, true
+		return line{}, true
 	}
-	return line, false
+	return s, false
 }
 
-func isHR(s Line) bool {
+func isHR(s line) bool {
 	t := s
 	t.trimSpace(0, 3, false)
 	switch c := t.peek(); c {
