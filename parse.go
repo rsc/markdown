@@ -122,7 +122,7 @@ type Parser struct {
 }
 
 type parseState struct {
-	root      Block
+	root      *Document
 	links     map[string]*Link
 	lineno    int
 	stack     []openBlock
@@ -152,7 +152,7 @@ func (p *Parser) pos() Position {
 	return b.pos
 }
 
-func (p *Parser) Parse(text string) Block {
+func (p *Parser) Parse(text string) *Document {
 	// Reset state so the Parser can be reused.
 	p.parseState = parseState{}
 	text = strings.ReplaceAll(text, "\x00", "\uFFFD")
@@ -243,7 +243,7 @@ func (p *Parser) closeBlock() Block {
 		b.inner = append(b.inner, blk)
 		// _ = b
 	} else {
-		p.root = blk
+		p.root = blk.(*Document)
 	}
 	return blk
 }
