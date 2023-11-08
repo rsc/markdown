@@ -118,6 +118,10 @@ type Parser struct {
 	//    <h2 id="overview">Overview</h2>
 	HeadingIDs bool
 
+	parseState
+}
+
+type parseState struct {
 	root      Block
 	links     map[string]*Link
 	lineno    int
@@ -149,6 +153,8 @@ func (p *Parser) pos() Position {
 }
 
 func (p *Parser) Parse(text string) Block {
+	// Reset state so the Parser can be reused.
+	p.parseState = parseState{}
 	text = strings.ReplaceAll(text, "\x00", "\uFFFD")
 	p.lineDepth = -1
 	p.addBlock(&rootBuilder{})
