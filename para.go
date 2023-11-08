@@ -30,7 +30,7 @@ type paraBuilder struct {
 	text []string
 }
 
-func (c *paraBuilder) extend(p *parser, s line) (line, bool) {
+func (c *paraBuilder) extend(p *Parser, s line) (line, bool) {
 	return s, false
 }
 
@@ -54,7 +54,7 @@ func (b *paraBuilder) build(p buildState) Block {
 	}
 }
 
-func newPara(p *parser, s line) (line, bool) {
+func newPara(p *Parser, s line) (line, bool) {
 	// Process paragraph continuation text or start new paragraph.
 	b := p.para()
 	if b != nil {

@@ -1,0 +1,47 @@
+HeadingIDs: true
+
+// Goldmark fails on 11 because it doesn't like slashes or spaces in ids.
+-- 1.md --
+# Heading
+-- 1.html --
+<h1>Heading</h1>
+-- 2.md --
+# Heading ###
+-- 2.html --
+<h1>Heading</h1>
+-- 3.md --
+# Heading {#id}
+-- 3.html --
+<h1 id="id">Heading</h1>
+-- 4.md --
+# Heading {#id} ##
+-- 4.html --
+<h1 id="id">Heading</h1>
+-- 5.md --
+# Heading {#id} more
+-- 5.html --
+<h1>Heading {#id} more</h1>
+-- 6.md --
+# Heading {nope}
+-- 6.html --
+<h1>Heading {nope}</h1>
+-- 7.md --
+# Heading {uhuh
+-- 7.html --
+<h1>Heading {uhuh</h1>
+-- 8.md --
+# {#no} Heading
+-- 8.html --
+<h1>{#no} Heading</h1>
+-- 9.md --
+# Heading {#id1} {#id2}
+-- 9.html --
+<h1 id="id2">Heading {#id1}</h1>
+-- 10.md --
+# Heading {#id1} {#id2
+-- 10.html --
+<h1>Heading {#id1} {#id2</h1>
+-- 11.md --
+# Heading {#a/b c}
+-- 11.html --
+<h1 id="a/b c">Heading</h1>

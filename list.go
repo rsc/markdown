@@ -119,7 +119,7 @@ func (b *itemBuilder) build(p buildState) Block {
 	return &Item{p.pos(), p.blocks()}
 }
 
-func (c *listBuilder) extend(p *parser, s line) (line, bool) {
+func (c *listBuilder) extend(p *Parser, s line) (line, bool) {
 	d := c.item
 	if d != nil && s.trimSpace(d.width, d.width, true) || d == nil && s.isBlank() {
 		return s, true
@@ -127,7 +127,7 @@ func (c *listBuilder) extend(p *parser, s line) (line, bool) {
 	return s, false
 }
 
-func (c *itemBuilder) extend(p *parser, s line) (line, bool) {
+func (c *itemBuilder) extend(p *Parser, s line) (line, bool) {
 	if s.isBlank() && !c.haveContent {
 		return s, false
 	}
@@ -142,7 +142,7 @@ func (c *itemBuilder) extend(p *parser, s line) (line, bool) {
 	return s, true
 }
 
-func newListItem(p *parser, s line) (line, bool) {
+func newListItem(p *Parser, s line) (line, bool) {
 	if list, ok := p.curB().(*listBuilder); ok && list.todo != nil {
 		s = list.todo()
 		list.todo = nil
@@ -154,7 +154,7 @@ func newListItem(p *parser, s line) (line, bool) {
 	return s, false
 }
 
-func (p *parser) startListItem(s *line) bool {
+func (p *Parser) startListItem(s *line) bool {
 	t := *s
 	n := 0
 	for i := 0; i < 3; i++ {

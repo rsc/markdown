@@ -14,7 +14,7 @@ func (b *ThematicBreak) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("<hr />\n")
 }
 
-func newHR(p *parser, s line) (line, bool) {
+func newHR(p *Parser, s line) (line, bool) {
 	if isHR(s) {
 		p.doneBlock(&ThematicBreak{Position{p.lineno, p.lineno}})
 		return line{}, true
