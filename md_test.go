@@ -34,8 +34,8 @@ func Test(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			var basep Parser
-			if err := setParserOptions(&basep, a.Comment); err != nil {
+			var p Parser
+			if err := setParserOptions(&p, a.Comment); err != nil {
 				t.Fatal(err)
 			}
 
@@ -50,9 +50,6 @@ func Test(t *testing.T) {
 				}
 
 				t.Run(name, func(t *testing.T) {
-					// Need a fresh Parser to clear parse state.
-					var p Parser
-					p.HeadingIDs = basep.HeadingIDs
 					doc := p.Parse(decode(string(md.Data)))
 					h := encode(ToHTML(doc))
 					if h != string(html.Data) {
@@ -66,7 +63,7 @@ func Test(t *testing.T) {
 				}
 				t.Run("goldmark/"+name, func(t *testing.T) {
 					opts := []goldmark.Option{goldmark.WithRendererOptions(ghtml.WithUnsafe())}
-					if basep.HeadingIDs {
+					if p.HeadingIDs {
 						opts = append(opts, goldmark.WithParserOptions(gparser.WithHeadingAttribute()))
 					}
 					gm := goldmark.New(opts...)
