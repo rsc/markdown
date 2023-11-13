@@ -52,7 +52,7 @@ type buildState interface {
 
 	link(label string) *Link
 	defineLink(label string, link *Link)
-	newText(pos Position, text string) Block
+	newText(pos Position, text string) *Text
 }
 
 type blockBuilder interface {
@@ -136,7 +136,7 @@ type parseState struct {
 	texts []*Text
 }
 
-func (p *Parser) newText(pos Position, text string) Block {
+func (p *Parser) newText(pos Position, text string) *Text {
 	b := &Text{Position: pos, raw: text}
 	p.texts = append(p.texts, b)
 	return b

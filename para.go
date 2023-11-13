@@ -17,7 +17,7 @@ func (b *Empty) PrintHTML(buf *bytes.Buffer) {}
 
 type Paragraph struct {
 	Position
-	Text Block
+	Text *Text
 }
 
 func (b *Paragraph) PrintHTML(buf *bytes.Buffer) {

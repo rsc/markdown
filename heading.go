@@ -13,7 +13,7 @@ import (
 type Heading struct {
 	Position
 	Level int
-	Text  Block
+	Text  *Text
 	// The HTML id attribute. The parser populates this field if
 	// [Parser.HeadingIDs] is true and the heading ends with text like "{#id}".
 	ID string
