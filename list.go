@@ -7,6 +7,7 @@ package markdown
 import (
 	"bytes"
 	"fmt"
+	"strings"
 )
 
 type List struct {
@@ -14,12 +15,13 @@ type List struct {
 	Bullet rune
 	Start  int
 	Loose  bool
-	Items  []Block
+	Items  []Block // always *Item
 }
 
 type Item struct {
 	Position
 	Blocks []Block
+	width  int
 }
 
 func (b *List) PrintHTML(buf *bytes.Buffer) {
@@ -40,6 +42,34 @@ func (b *List) PrintHTML(buf *bytes.Buffer) {
 	} else {
 		buf.WriteString("</ul>\n")
 	}
+}
+
+func (b *List) printMarkdown(buf *bytes.Buffer, s mdState) {
+	if buf.Len() > 0 && buf.Bytes()[buf.Len()-1] != '\n' {
+		buf.WriteByte('\n')
+	}
+	s.bullet = b.Bullet
+	s.num = b.Start
+	for i, item := range b.Items {
+		if i > 0 && b.Loose {
+			buf.WriteByte('\n')
+		}
+		item.printMarkdown(buf, s)
+		s.num++
+	}
+}
+
+func (b *Item) printMarkdown(buf *bytes.Buffer, s mdState) {
+	var marker string
+	if s.bullet == '.' || s.bullet == ')' {
+		marker = fmt.Sprintf("%d%c ", s.num, s.bullet)
+	} else {
+		marker = fmt.Sprintf("%c ", s.bullet)
+	}
+	marker = strings.Repeat(" ", b.width-len(marker)) + marker
+	s.prefix1 = s.prefix + marker
+	s.prefix += strings.Repeat(" ", len(marker))
+	printMarkdownBlocks(b.Blocks, buf, s)
 }
 
 func (b *Item) PrintHTML(buf *bytes.Buffer) {
@@ -116,7 +146,7 @@ Loose:
 
 func (b *itemBuilder) build(p buildState) Block {
 	b.list.item = nil
-	return &Item{p.pos(), p.blocks()}
+	return &Item{p.pos(), p.blocks(), b.width}
 }
 
 func (c *listBuilder) extend(p *Parser, s line) (line, bool) {

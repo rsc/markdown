@@ -4,19 +4,28 @@
 
 package markdown
 
-import "bytes"
+import (
+	"bytes"
+)
 
 type ThematicBreak struct {
 	Position
+	raw string
 }
 
 func (b *ThematicBreak) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("<hr />\n")
 }
 
+func (b *ThematicBreak) printMarkdown(buf *bytes.Buffer, s mdState) {
+	buf.WriteString(s.prefix)
+	buf.WriteString(b.raw)
+	buf.WriteByte('\n')
+}
+
 func newHR(p *Parser, s line) (line, bool) {
 	if isHR(s) {
-		p.doneBlock(&ThematicBreak{Position{p.lineno, p.lineno}})
+		p.doneBlock(&ThematicBreak{Position{p.lineno, p.lineno}, s.string()})
 		return line{}, true
 	}
 	return s, false
@@ -49,6 +58,10 @@ func (x *HardBreak) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("<br />\n")
 }
 
+func (x *HardBreak) printMarkdown(buf *bytes.Buffer) {
+	buf.WriteString("\\\n")
+}
+
 func (x *HardBreak) PrintText(buf *bytes.Buffer) {}
 
 type SoftBreak struct{}
@@ -56,6 +69,10 @@ type SoftBreak struct{}
 func (*SoftBreak) Inline() {}
 
 func (x *SoftBreak) PrintHTML(buf *bytes.Buffer) {
+	buf.WriteString("\n")
+}
+
+func (x *SoftBreak) printMarkdown(buf *bytes.Buffer) {
 	buf.WriteString("\n")
 }
 

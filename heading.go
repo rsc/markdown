@@ -29,6 +29,21 @@ func (b *Heading) PrintHTML(buf *bytes.Buffer) {
 	fmt.Fprintf(buf, "</h%d>\n", b.Level)
 }
 
+func (b *Heading) printMarkdown(buf *bytes.Buffer, s mdState) {
+	// TODO: handle setext headings properly.
+	buf.WriteString(s.prefix)
+	for i := 0; i < b.Level; i++ {
+		buf.WriteByte('#')
+	}
+	buf.WriteByte(' ')
+	// The prefix has already been printed for this line of text.
+	s.prefix = ""
+	b.Text.printMarkdown(buf, s)
+	if b.ID != "" {
+		fmt.Fprintf(buf, " {#%s}", b.ID)
+	}
+}
+
 func newATXHeading(p *Parser, s line) (line, bool) {
 	peek := s
 	var n int

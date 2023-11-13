@@ -68,6 +68,7 @@ each completed one invokes emphasis on inner text and then on the overall list.
 type Inline interface {
 	PrintHTML(*bytes.Buffer)
 	PrintText(*bytes.Buffer)
+	printMarkdown(*bytes.Buffer)
 }
 
 type Plain struct {
@@ -78,6 +79,10 @@ func (*Plain) Inline() {}
 
 func (x *Plain) PrintHTML(buf *bytes.Buffer) {
 	htmlEscaper.WriteString(buf, x.Text)
+}
+
+func (x *Plain) printMarkdown(buf *bytes.Buffer) {
+	buf.WriteString(x.Text)
 }
 
 func (x *Plain) PrintText(buf *bytes.Buffer) {
@@ -101,8 +106,14 @@ type Escaped struct {
 	Plain
 }
 
+func (x *Escaped) printMarkdown(buf *bytes.Buffer) {
+	buf.WriteByte('\\')
+	x.Plain.printMarkdown(buf)
+}
+
 type Code struct {
-	Text string
+	Text     string
+	numTicks int
 }
 
 func (*Code) Inline() {}
@@ -111,12 +122,20 @@ func (x *Code) PrintHTML(buf *bytes.Buffer) {
 	fmt.Fprintf(buf, "<code>%s</code>", htmlEscaper.Replace(x.Text))
 }
 
+func (x *Code) printMarkdown(buf *bytes.Buffer) {
+	ticks := strings.Repeat("`", x.numTicks)
+	buf.WriteString(ticks)
+	buf.WriteString(x.Text)
+	buf.WriteString(ticks)
+}
+
 func (x *Code) PrintText(buf *bytes.Buffer) {
 	htmlEscaper.WriteString(buf, x.Text)
 }
 
 type Strong struct {
 	Inner []Inline
+	Char  byte // '_' or '*'
 }
 
 func (x *Strong) Inline() {
@@ -130,6 +149,16 @@ func (x *Strong) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("</strong>")
 }
 
+func (x *Strong) printMarkdown(buf *bytes.Buffer) {
+	buf.WriteByte(x.Char)
+	buf.WriteByte(x.Char)
+	for _, c := range x.Inner {
+		c.printMarkdown(buf)
+	}
+	buf.WriteByte(x.Char)
+	buf.WriteByte(x.Char)
+}
+
 func (x *Strong) PrintText(buf *bytes.Buffer) {
 	for _, c := range x.Inner {
 		c.PrintText(buf)
@@ -138,6 +167,7 @@ func (x *Strong) PrintText(buf *bytes.Buffer) {
 
 type Emph struct {
 	Inner []Inline
+	Char  byte // '_' or '*'
 }
 
 func (*Emph) Inline() {}
@@ -148,6 +178,14 @@ func (x *Emph) PrintHTML(buf *bytes.Buffer) {
 		c.PrintHTML(buf)
 	}
 	buf.WriteString("</em>")
+}
+
+func (x *Emph) printMarkdown(buf *bytes.Buffer) {
+	buf.WriteByte(x.Char)
+	for _, c := range x.Inner {
+		c.printMarkdown(buf)
+	}
+	buf.WriteByte(x.Char)
 }
 
 func (x *Emph) PrintText(buf *bytes.Buffer) {
@@ -289,7 +327,7 @@ func (p *Parser) emph(dst, src []Inline) []Inline {
 						// emph
 						d = 1
 					}
-					x := &Emph{Inner: append([]Inline(nil), dst[start.i+1:]...)}
+					x := &Emph{Char: p.Text[0], Inner: append([]Inline(nil), dst[start.i+1:]...)}
 					start.Text = start.Text[:len(start.Text)-d]
 					p.Text = p.Text[d:]
 					if start.Text == "" {
@@ -413,7 +451,7 @@ func parseCodeSpan(s string, i int) (Inline, int, int, bool) {
 				text = text[1 : len(text)-1]
 			}
 
-			return &Code{text}, start, end, true
+			return &Code{text, n}, start, end, true
 		}
 	}
 
@@ -561,6 +599,7 @@ func (p *Parser) parseLinkClose(s string, i int, open *openPlain) (*Link, int, b
 			// Inline link - [Text](Dest Title), with Title omitted or both Dest and Title omitted.
 			i := skipSpace(s, i+2)
 			var dest, title string
+			var titleChar byte
 			if i < len(s) && s[i] != ')' {
 				var ok bool
 				dest, i, ok = parseLinkDest(s, i)
@@ -569,7 +608,7 @@ func (p *Parser) parseLinkClose(s string, i int, open *openPlain) (*Link, int, b
 				}
 				i = skipSpace(s, i)
 				if i < len(s) && s[i] != ')' {
-					title, i, ok = parseLinkTitle(s, i)
+					title, titleChar, i, ok = parseLinkTitle(s, i)
 					if !ok {
 						break
 					}
@@ -577,7 +616,7 @@ func (p *Parser) parseLinkClose(s string, i int, open *openPlain) (*Link, int, b
 				}
 			}
 			if i < len(s) && s[i] == ')' {
-				return &Link{URL: dest, Title: title}, i + 1, true
+				return &Link{URL: dest, Title: title, TitleChar: titleChar}, i + 1, true
 			}
 			// NOTE: Test malformed ( ) with shortcut reference
 			// TODO fall back on syntax error?

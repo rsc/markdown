@@ -48,17 +48,19 @@ func parseLinkRefDef(p buildState, s string) (int, bool) {
 	}
 
 	var title string
+	var titleChar byte
 	if moved {
 		for j < len(s) && (s[j] == ' ' || s[j] == '\t') {
 			j++
 		}
-		if t, j, ok := parseLinkTitle(s, j); ok {
+		if t, c, j, ok := parseLinkTitle(s, j); ok {
 			for j < len(s) && (s[j] == ' ' || s[j] == '\t') {
 				j++
 			}
 			if j >= len(s) || s[j] == '\n' {
 				i = j
 				title = t
+				titleChar = c
 			}
 		}
 	}
@@ -73,12 +75,12 @@ func parseLinkRefDef(p buildState, s string) (int, bool) {
 
 	label = normalizeLabel(label)
 	if p.link(label) == nil {
-		p.defineLink(label, &Link{URL: dest, Title: title})
+		p.defineLink(label, &Link{URL: dest, Title: title, TitleChar: titleChar})
 	}
 	return i, true
 }
 
-func parseLinkTitle(s string, i int) (string, int, bool) {
+func parseLinkTitle(s string, i int) (title string, char byte, next int, found bool) {
 	if i < len(s) && (s[i] == '"' || s[i] == '\'' || s[i] == '(') {
 		want := s[i]
 		if want == '(' {
@@ -89,7 +91,7 @@ func parseLinkTitle(s string, i int) (string, int, bool) {
 			if s[j] == want {
 				title := s[i+1 : j]
 				// TODO: Validate title?
-				return mdUnescaper.Replace(title), j + 1, true
+				return mdUnescaper.Replace(title), want, j + 1, true
 			}
 			if s[j] == '(' && want == ')' {
 				break
@@ -99,7 +101,7 @@ func parseLinkTitle(s string, i int) (string, int, bool) {
 			}
 		}
 	}
-	return "", 0, false
+	return "", 0, 0, false
 }
 
 func parseLinkLabel(s string, i int) (string, int, bool) {
@@ -354,14 +356,19 @@ func (x *AutoLink) PrintHTML(buf *bytes.Buffer) {
 	fmt.Fprintf(buf, "<a href=\"%s\">%s</a>", htmlLinkEscaper.Replace(x.URL), htmlEscaper.Replace(x.Text))
 }
 
+func (x *AutoLink) printMarkdown(buf *bytes.Buffer) {
+	fmt.Fprintf(buf, "<%s>", x.Text)
+}
+
 func (x *AutoLink) PrintText(buf *bytes.Buffer) {
 	fmt.Fprintf(buf, "%s", htmlEscaper.Replace(x.Text))
 }
 
 type Link struct {
-	Inner []Inline
-	URL   string
-	Title string
+	Inner     []Inline
+	URL       string
+	Title     string
+	TitleChar byte // ', " or )
 }
 
 func (*Link) Inline() {}
@@ -378,6 +385,29 @@ func (x *Link) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("</a>")
 }
 
+func (x *Link) printMarkdown(buf *bytes.Buffer) {
+	buf.WriteByte('[')
+	x.printRemainingMarkdown(buf)
+}
+
+func (x *Link) printRemainingMarkdown(buf *bytes.Buffer) {
+	// TODO(jba): escaping
+	for _, c := range x.Inner {
+		c.printMarkdown(buf)
+	}
+	buf.WriteString("](")
+	buf.WriteString(x.URL)
+	if x.Title != "" {
+		closeChar := x.TitleChar
+		openChar := closeChar
+		if openChar == ')' {
+			openChar = '('
+		}
+		fmt.Fprintf(buf, " %c%s%c", openChar, x.Title /*TODO: escape*/, closeChar)
+	}
+	buf.WriteByte(')')
+}
+
 func (x *Link) PrintText(buf *bytes.Buffer) {
 	for _, c := range x.Inner {
 		c.PrintText(buf)
@@ -385,9 +415,10 @@ func (x *Link) PrintText(buf *bytes.Buffer) {
 }
 
 type Image struct {
-	Inner []Inline
-	URL   string
-	Title string
+	Inner     []Inline
+	URL       string
+	Title     string
+	TitleChar byte
 }
 
 func (*Image) Inline() {}
@@ -403,6 +434,11 @@ func (x *Image) PrintHTML(buf *bytes.Buffer) {
 		fmt.Fprintf(buf, " title=\"%s\"", htmlQuoteEscaper.Replace(x.Title))
 	}
 	buf.WriteString(" />")
+}
+
+func (x *Image) printMarkdown(buf *bytes.Buffer) {
+	buf.WriteString("![")
+	(*Link)(x).printRemainingMarkdown(buf)
 }
 
 func (x *Image) PrintText(buf *bytes.Buffer) {

@@ -30,9 +30,30 @@ preserve LinkRefDefs?
 
 */
 
+// Block is implemented by:
+//
+//	CodeBLock
+//	Document
+//	Empty
+//	HTMLBlock
+//	Heading
+//	Item
+//	List
+//	Paragraph
+//	Quote
+//	Text
+//	ThematicBreak
 type Block interface {
 	Pos() Position
 	PrintHTML(buf *bytes.Buffer)
+	printMarkdown(buf *bytes.Buffer, s mdState)
+}
+
+type mdState struct {
+	prefix  string
+	prefix1 string // for first line only
+	bullet  rune   // for list items
+	num     int    // for numbered list items
 }
 
 type Position struct {
@@ -92,6 +113,24 @@ func (b *Text) PrintHTML(buf *bytes.Buffer) {
 	for _, x := range b.Inline {
 		x.PrintHTML(buf)
 	}
+}
+
+func (b *Text) printMarkdown(buf *bytes.Buffer, s mdState) {
+	if s.prefix1 != "" {
+		buf.WriteString(s.prefix1)
+	} else {
+		buf.WriteString(s.prefix)
+	}
+	var prev Inline
+	for _, x := range b.Inline {
+		switch prev.(type) {
+		case *SoftBreak, *HardBreak:
+			buf.WriteString(s.prefix)
+		}
+		x.printMarkdown(buf)
+		prev = x
+	}
+	buf.WriteByte('\n')
 }
 
 type rootBuilder struct{}
@@ -156,6 +195,7 @@ func (p *Parser) Parse(text string) *Document {
 	// Reset state so the Parser can be reused.
 	p.parseState = parseState{}
 	text = strings.ReplaceAll(text, "\x00", "\uFFFD")
+
 	p.lineDepth = -1
 	p.addBlock(&rootBuilder{})
 	for text != "" {
@@ -417,13 +457,49 @@ func ToHTML(b Block) string {
 	return buf.String()
 }
 
+func ToMarkdown(b Block) string {
+	var buf bytes.Buffer
+	b.printMarkdown(&buf, mdState{})
+	s := buf.String()
+	// Remove final extra newline.
+	if strings.HasSuffix(s, "\n\n") {
+		s = s[:len(s)-1]
+	}
+	return s
+}
+
 func (b *Document) PrintHTML(buf *bytes.Buffer) {
 	for _, c := range b.Blocks {
 		c.PrintHTML(buf)
 	}
 }
 
-var blocksType = reflect.TypeOf(new([]Block)).Elem()
+func (b *Document) printMarkdown(buf *bytes.Buffer, s mdState) {
+	printMarkdownBlocks(b.Blocks, buf, s)
+	// TODO(jba): print links
+}
+
+func printMarkdownBlocks(bs []Block, buf *bytes.Buffer, s mdState) {
+	prevEnd := 0
+	for _, b := range bs {
+		// Preserve blank lines between blocks.
+		if prevEnd > 0 {
+			for i := prevEnd + 1; i < b.Pos().StartLine; i++ {
+				buf.WriteString(strings.TrimRight(s.prefix, " \t"))
+				buf.WriteByte('\n')
+			}
+		}
+		b.printMarkdown(buf, s)
+		prevEnd = b.Pos().EndLine
+		s.prefix1 = "" // item prefix only for first block
+	}
+}
+
+var (
+	blockType   = reflect.TypeOf(new(Block)).Elem()
+	blocksType  = reflect.TypeOf(new([]Block)).Elem()
+	inlinesType = reflect.TypeOf(new([]Inline)).Elem()
+)
 
 func printb(buf *bytes.Buffer, b Block, prefix string) {
 	fmt.Fprintf(buf, "(%T", b)
@@ -438,8 +514,12 @@ func printb(buf *bytes.Buffer, b Block, prefix string) {
 		if !tf.IsExported() {
 			continue
 		}
-		if tf.Type != blocksType {
-			fmt.Fprintf(buf, " %s:%v", tf.Name, v.Field(i))
+		if tf.Type != blocksType && !tf.Type.Implements(blockType) {
+			if tf.Type == inlinesType {
+				printis(buf, v.Field(i).Interface().([]Inline))
+			} else {
+				fmt.Fprintf(buf, " %s:%v", tf.Name, v.Field(i))
+			}
 		}
 	}
 
@@ -449,7 +529,10 @@ func printb(buf *bytes.Buffer, b Block, prefix string) {
 		if !tf.IsExported() {
 			continue
 		}
-		if tf.Type == blocksType {
+		if tf.Type.Implements(blockType) {
+			fmt.Fprintf(buf, "\n%s", prefix)
+			printb(buf, v.Field(i).Interface().(Block), prefix)
+		} else if tf.Type == blocksType {
 			vf := v.Field(i)
 			for i := 0; i < vf.Len(); i++ {
 				fmt.Fprintf(buf, "\n%s", prefix)
@@ -458,6 +541,27 @@ func printb(buf *bytes.Buffer, b Block, prefix string) {
 		}
 	}
 	fmt.Fprintf(buf, ")")
+}
+
+func printi(buf *bytes.Buffer, in Inline) {
+	fmt.Fprintf(buf, "%T(", in)
+	v := reflect.ValueOf(in).Elem()
+	text := v.FieldByName("Text")
+	if text.IsValid() {
+		fmt.Fprintf(buf, "%q", text)
+	}
+	inner := v.FieldByName("Inner")
+	if inner.IsValid() {
+		printis(buf, inner.Interface().([]Inline))
+	}
+	buf.WriteString(")")
+}
+
+func printis(buf *bytes.Buffer, ins []Inline) {
+	for _, in := range ins {
+		buf.WriteByte(' ')
+		printi(buf, in)
+	}
 }
 
 func dump(b Block) string {

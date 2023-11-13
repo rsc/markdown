@@ -1,0 +1,216 @@
+Test cases for ToMarkdown.
+-- one --
+A single line.
+-- one_blank --
+A single line with a blank line.
+
+-- want --
+A single line with a blank line.
+-- paragraphs --
+This is the first paragraph
+spanning multiple lines.
+
+Here is another paragraph.
+-- emph --
+one _two_ *three* __four__ plain text **five** _*six*_ _seven 8 9_
+-- escaped --
+one \_two_ *three\* \\ \[text]
+-- code --
+The output is `hello,` `world`.
+-- link --
+A [link with no title](http://a)
+[with title](http://b "title")
+[single quoted](http://c 'title')
+[parens](https://d (title))
+-- link_spacing --
+[with title](http://b   "title")
+[single quoted](http://c	'title')
+[parens](https://d   (title))
+-- want --
+[with title](http://b "title")
+[single quoted](http://c 'title')
+[parens](https://d (title))
+-- autolink --
+Contact <mailto:me@gmail.com>.
+-- image --
+![image](http://a "title")
+-- htmltag --
+Using <i>italics</i> and <code>code</code>.
+-- hardbreak --
+foo\
+baz
+-- hardbreak_emph --
+*foo\
+bar*
+-- thematic --
+***
+-- thematic2 --
+   ------
+-- thematic3 --
+First theme.
+***
+
+Second theme.
+-- paragraphs --
+First paragraph,
+spanning two lines.
+
+Here's a second one.
+-- heading1 --
+# H1
+
+Content.
+-- heading2 --
+## H2 some  `code` ####
+
+More.
+
+### H3
+No space.
+-- want --
+## H2 some  `code`
+
+More.
+
+### H3
+No space.
+-- heading3 --
+****
+## foo
+****
+-- codeblock1 --
+As shown here:
+```
+func f(int)
+```
+And more.
+-- codeblock2 --
+As shown here:
+
+```
+func f(int)
+```
+
+And more.
+-- codeblock3 --
+Indented
+
+    func f(int)
+
+done.
+-- codeblock4 --
+Indented
+
+	func f(int)
+
+done.
+-- want --
+Indented
+
+    func f(int)
+
+done.
+-- codeblock5 --
+tildes
+~~~~~
+func f(int)
+~~~~~
+done
+-- htmlblock --
+Literally,
+<pre>
+  something
+<pre>
+Done.
+-- list_tight --
+- one
+- two
+- three
+-- list_loose --
+- one
+
+- two
+
+- three
+-- numlist_tight --
+1. Lather.
+2. Rinse.
+3. Repeat.
+-- numlist_tight_renumber --
+1) Lather.
+1) Rinse.
+2) Repeat.
+-- want --
+1) Lather.
+2) Rinse.
+3) Repeat.
+-- numlist_loose --
+1. Lather
+2. Rinse
+
+3. Repeat
+-- want --
+1. Lather
+
+2. Rinse
+
+3. Repeat
+-- list_lines_tight --
+- A first
+  item.
+- Items can span
+  lines.
+- Or not.
+-- list_lines_loose --
+- A first
+  item.
+
+- Items can span
+  lines.
+
+- Or not.
+-- list_nest --
+- Intro
+  1. first
+  2. second
+- Middle
+  * alpha
+- End
+-- list_indent --
+We have:
+
+  - First.
+  - Second.
+-- quote1 --
+As Celine said:
+> Love is the infinite
+placed within the reach of poodles.
+
+The end.
+-- want --
+As Celine said:
+> Love is the infinite
+> placed within the reach of poodles.
+
+The end.
+-- quote2 --
+> Anything can be quoted.
+> ### like a heading
+>
+> Or a list:
+> - a
+> - b
+>
+> ```
+> some code
+> ```
+-- quote3 --
+   > drop indentation
+-- want --
+> drop indentation
+-- inline_code1 --
+` \[\` `
+-- inline_code2 --
+`` \[\` ``
+-- want --
+``\[\```

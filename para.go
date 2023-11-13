@@ -15,6 +15,8 @@ type Empty struct {
 
 func (b *Empty) PrintHTML(buf *bytes.Buffer) {}
 
+func (b *Empty) printMarkdown(*bytes.Buffer, mdState) {}
+
 type Paragraph struct {
 	Position
 	Text *Text
@@ -24,6 +26,14 @@ func (b *Paragraph) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("<p>")
 	b.Text.PrintHTML(buf)
 	buf.WriteString("</p>\n")
+}
+
+func (b *Paragraph) printMarkdown(buf *bytes.Buffer, s mdState) {
+	// // Ignore prefix when in a list.
+	// if s.bullet == 0 {
+	// 	buf.WriteString(s.prefix)
+	// }
+	b.Text.printMarkdown(buf, s)
 }
 
 type paraBuilder struct {

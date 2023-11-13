@@ -38,10 +38,53 @@ func (b *CodeBlock) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("</code></pre>\n")
 }
 
+// func initialSpaces(s string) int {
+// 	for i := 0; i < len(s); i++ {
+// 		if s[i] != ' ' {
+// 			return i
+// 		}
+// 	}
+// 	return len(s)
+// }
+
+func (b *CodeBlock) printMarkdown(buf *bytes.Buffer, s mdState) {
+	prefix1 := s.prefix1
+	if prefix1 == "" {
+		prefix1 = s.prefix
+	}
+	if b.Fence == "" {
+		for i, line := range b.Text {
+			// Ignore final empty line (why is it even there?).
+			if i == len(b.Text)-1 && len(line) == 0 {
+				break
+			}
+			// var iline string
+			// is := initialSpaces(line)
+			// if is < 4 {
+			// 	iline = "    " + line
+			// } else {
+			// 	iline = "\t" + line[4:]
+			// }
+			// Indent by 4 spaces.
+			pre := s.prefix
+			if i == 0 {
+				pre = prefix1
+			}
+			fmt.Fprintf(buf, "%s%s%s\n", pre, "    ", line)
+		}
+	} else {
+		fmt.Fprintf(buf, "%s%s\n", prefix1, b.Fence)
+		for _, line := range b.Text {
+			fmt.Fprintf(buf, "%s%s\n", s.prefix, line)
+		}
+		fmt.Fprintf(buf, "%s%s\n", s.prefix, b.Fence)
+	}
+}
+
 func newPre(p *Parser, s line) (line, bool) {
 	peek2 := s
 	if p.para() == nil && peek2.trimSpace(4, 4, false) && !peek2.isBlank() {
-		b := &preBuilder{}
+		b := &preBuilder{ /*indent: strings.TrimSuffix(s.string(), peek2.string())*/ }
 		p.addBlock(b)
 		b.text = append(b.text, peek2.string())
 		return line{}, true
@@ -96,8 +139,10 @@ func (s *line) trimFence(fence, info *string, n *int) bool {
 	return false
 }
 
+// For indented code blocks.
 type preBuilder struct {
-	text []string
+	indent string
+	text   []string
 }
 
 func (c *preBuilder) extend(p *Parser, s line) (line, bool) {

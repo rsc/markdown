@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -22,12 +23,15 @@ import (
 
 var goldmarkFlag = flag.Bool("goldmark", false, "run goldmark tests")
 
-func Test(t *testing.T) {
+func TestToHTML(t *testing.T) {
 	files, err := filepath.Glob("testdata/*.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, file := range files {
+		if strings.HasSuffix(file, "to_markdown.txt") {
+			continue
+		}
 		t.Run(strings.TrimSuffix(filepath.Base(file), ".txt"), func(t *testing.T) {
 			a, err := txtar.ParseFile(file)
 			if err != nil {
@@ -137,4 +141,69 @@ func setParserOptions(p *Parser, data []byte) error {
 		}
 	}
 	return nil
+}
+
+func TestToMarkdown(t *testing.T) {
+	// txtar files end in "_to_markdown.txt" and use the same encoding as
+	// for the HTML tests.
+	const suffix = "_to_markdown.txt"
+	files, err := filepath.Glob(filepath.Join("testdata", "*"+suffix))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range files {
+		t.Run(strings.TrimSuffix(filepath.Base(file), suffix), func(t *testing.T) {
+			a, err := txtar.ParseFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var p Parser
+			for i := 0; i < len(a.Files); {
+				// Each test case is a single markdown document that should render either as itself,
+				// or if followed by a file named "want", then by that file.
+				name := a.Files[i].Name
+				in := a.Files[i].Data
+				want := in
+				i++
+				if i < len(a.Files) && a.Files[i].Name == "want" {
+					want = a.Files[i].Data
+					i++
+				}
+				t.Run(name, func(t *testing.T) {
+					doc := p.Parse(decode(string(in)))
+					h := ToMarkdown(doc)
+					h = encode(h)
+					if h != string(want) {
+						t.Errorf("input %q\nparse: \n%s\nhave %q\nwant %q", in, dump(doc), h, want)
+					}
+				})
+			}
+		})
+	}
+
+	// Files ending in ".md" should render as themselves.
+	files, err = filepath.Glob(filepath.Join("testdata", "*.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range files {
+		t.Run(strings.TrimSuffix(filepath.Base(file), ".md"), func(t *testing.T) {
+			data, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			w := string(data)
+			var p Parser
+			doc := p.Parse(w)
+			h := ToMarkdown(doc)
+			if h != w {
+				t.Errorf("have:\n%s\nwant:\n%s", h, w)
+				outfile := file + ".have"
+				t.Logf("writing have to %s", outfile)
+				if err := os.WriteFile(outfile, []byte(h), 0400); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+	}
 }

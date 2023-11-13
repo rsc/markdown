@@ -19,6 +19,11 @@ func (b *Quote) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("</blockquote>\n")
 }
 
+func (b *Quote) printMarkdown(buf *bytes.Buffer, s mdState) {
+	s.prefix += "> "
+	printMarkdownBlocks(b.Blocks, buf, s)
+}
+
 func trimQuote(s line) (line, bool) {
 	t := s
 	t.trimSpace(0, 3, false)
