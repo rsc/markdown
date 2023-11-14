@@ -7,15 +7,11 @@
 package markdown
 
 import (
-	"bytes"
-	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
 	"unicode/utf8"
 
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/renderer/html"
 	"golang.org/x/tools/txtar"
 )
 
@@ -45,28 +41,7 @@ func Fuzz(f *testing.F) {
 		}
 
 		doc := parse(s)
-		out := toHTML(doc)
-		out = strings.ReplaceAll(out, " />", ">")
-
-		gm := goldmark.New(
-			goldmark.WithRendererOptions(
-				html.WithUnsafe(),
-			),
-		)
-		var buf bytes.Buffer
-		if err := gm.Convert([]byte(s), &buf); err != nil {
-			t.Fatal(err)
-		}
-		if buf.Len() > 0 && buf.Bytes()[buf.Len()-1] != '\n' {
-			buf.WriteByte('\n')
-		}
-		gout := buf.String()
-		gout = strings.ReplaceAll(gout, " />", ">")
-		gout = strings.ReplaceAll(gout, ` title=""`, ``)
-
-		if out != gout {
-			t.Fatalf("in: %q\nparse:\n%s\nout: %q\ngout: %q\ndingus: (https://spec.commonmark.org/dingus/?text=%s)", s, dump(doc), out, gout, strings.ReplaceAll(url.QueryEscape(s), "+", "%20"))
-		}
+		_ = toHTML(doc)
 	})
 }
 

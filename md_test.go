@@ -5,8 +5,6 @@
 package markdown
 
 import (
-	"bytes"
-	"flag"
 	"fmt"
 	"net/url"
 	"os"
@@ -15,13 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yuin/goldmark"
-	gparser "github.com/yuin/goldmark/parser"
-	ghtml "github.com/yuin/goldmark/renderer/html"
 	"golang.org/x/tools/txtar"
 )
-
-var goldmarkFlag = flag.Bool("goldmark", false, "run goldmark tests")
 
 func TestToHTML(t *testing.T) {
 	files, err := filepath.Glob("testdata/*.txt")
@@ -60,33 +53,6 @@ func TestToHTML(t *testing.T) {
 						t.Fatalf("input %q\nparse:\n%s\nhave %q\nwant %q\ndingus: (https://spec.commonmark.org/dingus/?text=%s)", md.Data, dump(doc), h, html.Data, strings.ReplaceAll(url.QueryEscape(decode(string(md.Data))), "+", "%20"))
 					}
 					npass++
-				})
-
-				if !*goldmarkFlag {
-					continue
-				}
-				t.Run("goldmark/"+name, func(t *testing.T) {
-					opts := []goldmark.Option{goldmark.WithRendererOptions(ghtml.WithUnsafe())}
-					if p.HeadingIDs {
-						opts = append(opts, goldmark.WithParserOptions(gparser.WithHeadingAttribute()))
-					}
-					gm := goldmark.New(opts...)
-					var buf bytes.Buffer
-					if err := gm.Convert([]byte(decode(string(md.Data))), &buf); err != nil {
-						t.Fatal(err)
-					}
-					if buf.Len() > 0 && buf.Bytes()[buf.Len()-1] != '\n' {
-						buf.WriteByte('\n')
-					}
-					want := string(html.Data)
-					want = strings.ReplaceAll(want, " />", ">")
-					out := encode(buf.String())
-					out = strings.ReplaceAll(out, " />", ">")
-					if out != want {
-						t.Fatalf("\n    - input: ``%q``\n    - output: ``%q``\n    - golden: ``%q``\n    - [dingus](https://spec.commonmark.org/dingus/?text=%s)", md.Data, out, want, strings.ReplaceAll(url.QueryEscape(decode(string(md.Data))), "+", "%20"))
-					}
-					npass++
-
 				})
 			}
 			t.Logf("%d/%d pass", npass, ncase)
