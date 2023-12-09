@@ -1,12 +1,12 @@
-// Strikethrough <del> tests.
-//
-// gfm* from https://github.github.com/gfm/#strikethrough-extension-
-// (version 0.29-gfm (2019-04-06))
-//
-// Others by hand, guessing based on GitHub behavior.
+Strikethrough <del> tests.
 
-Strikethrough: true
+gfm* from https://github.github.com/gfm/#strikethrough-extension-
+(version 0.29-gfm (2019-04-06))
 
+Others by hand, guessing based on GitHub behavior.
+
+-- parser.json --
+{"Strikethrough": true}
 -- gfm491.md --
 ~~Hi~~ Hello, ~there~ world!
 -- gfm491.html --

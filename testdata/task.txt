@@ -1,0 +1,54 @@
+Task list items tests.
+
+gfm* from https://github.github.com/gfm/#task-list-items-extension-
+(version 0.29-gfm (2019-04-06))
+
+Others by hand, guessing based on GitHub behavior.
+
+-- parser.json --
+{"TaskListItems": true}
+-- gfm279.md --
+- [ ] foo
+- [x] bar
+-- gfm279.html --
+<ul>
+<li><input disabled="" type="checkbox"> foo</li>
+<li><input checked="" disabled="" type="checkbox"> bar</li>
+</ul>
+-- gfm280.md --
+- [x] foo
+  - [ ] bar
+  - [x] baz
+- [ ] bim
+-- gfm280.html --
+<ul>
+<li><input checked="" disabled="" type="checkbox"> foo
+<ul>
+<li><input disabled="" type="checkbox"> bar</li>
+<li><input checked="" disabled="" type="checkbox"> baz</li>
+</ul>
+</li>
+<li><input disabled="" type="checkbox"> bim</li>
+</ul>
+-- spaces.md --
+-  [ ] foo
+-   [x] bar
+- [ ]quux
+-- spaces.html --
+<ul>
+<li><input disabled="" type="checkbox"> foo</li>
+<li><input checked="" disabled="" type="checkbox"> bar</li>
+<li>[ ]quux</li>
+</ul>
+-- wxyz.md --
+- [w] woolloomooloo
+- [x] foo
+- [y] bar
+- [z] baz
+-- wxyz.html --
+<ul>
+<li>[w] woolloomooloo</li>
+<li><input checked="" disabled="" type="checkbox"> foo</li>
+<li>[y] bar</li>
+<li>[z] baz</li>
+</ul>

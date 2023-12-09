@@ -266,3 +266,76 @@ Switch:
 	}
 	return true
 }
+
+// GitHub task list extension
+
+func (ps *parseState) taskList(list *List) {
+	for _, item := range list.Items {
+		item := item.(*Item)
+		if len(item.Blocks) == 0 {
+			continue
+		}
+		var text *Text
+		switch b := item.Blocks[0].(type) {
+		default:
+			continue
+		case *Paragraph:
+			text = b.Text
+		case *Text:
+			text = b
+		}
+		if len(text.Inline) < 2 {
+			continue
+		}
+		plain1, ok1 := text.Inline[0].(*Plain)
+		plain2, ok2 := text.Inline[1].(*Plain)
+		if !ok1 || !ok2 || plain1.Text != "[" || len(plain2.Text) < 3 || plain2.Text[1] != ']' {
+			continue
+		}
+		if c := plain2.Text[0]; c != ' ' && c != 'x' {
+			continue
+		}
+		if c := plain2.Text[2]; c != ' ' && c != '\t' {
+			continue
+		}
+		text.Inline[0] = &Task{Checked: plain2.Text[0] == 'x'}
+		plain2.Text = plain2.Text[2:]
+	}
+}
+
+func ins(first Inline, x []Inline) []Inline {
+	x = append(x, nil)
+	copy(x[1:], x)
+	x[0] = first
+	return x
+}
+
+type Task struct {
+	Checked bool
+}
+
+func (x *Task) Inline() {
+}
+
+func (x *Task) PrintHTML(buf *bytes.Buffer) {
+	buf.WriteString("<input ")
+	if x.Checked {
+		buf.WriteString(`checked="" `)
+	}
+	buf.WriteString(`disabled="" type="checkbox">`)
+}
+
+func (x *Task) printMarkdown(buf *bytes.Buffer) {
+	x.PrintText(buf)
+}
+
+func (x *Task) PrintText(buf *bytes.Buffer) {
+	buf.WriteByte('[')
+	if x.Checked {
+		buf.WriteByte('x')
+	} else {
+		buf.WriteByte(' ')
+	}
+	buf.WriteByte(']')
+	buf.WriteByte(' ')
+}

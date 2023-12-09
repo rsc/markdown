@@ -162,6 +162,12 @@ type Parser struct {
 	// ~abc~ and ~~abc~~ as strikethrough syntax, producing
 	// <del>abc</del> in HTML.
 	Strikethrough bool
+
+	// TaskListItems determines whether the parser accepts
+	// “task list items” as defined in GitHub Flavored Markdown.
+	// When a list item begins with the plain text [ ] or [x]
+	// that turns into an unchecked or checked check box.
+	TaskListItems bool
 }
 
 type parseState struct {
@@ -178,6 +184,8 @@ type parseState struct {
 	emitted int // s[:emitted] has been emitted into list
 	list    []Inline
 
+	// for fixup at end
+	lists []*List
 	texts []*Text
 }
 
@@ -228,6 +236,12 @@ func (p *Parser) Parse(text string) *Document {
 
 	for _, t := range ps.texts {
 		t.Inline = ps.inline(t.raw)
+	}
+
+	if p.TaskListItems {
+		for _, list := range ps.lists {
+			ps.taskList(list)
+		}
 	}
 
 	return ps.root
@@ -283,6 +297,9 @@ func (p *parseState) closeBlock() Block {
 		println("closeBlock", len(p.stack)-1)
 	}
 	blk := b.builder.build(p)
+	if list, ok := blk.(*List); ok && p.TaskListItems {
+		p.lists = append(p.lists, list)
+	}
 	p.stack = p.stack[:len(p.stack)-1]
 	if len(p.stack) > 0 {
 		b := &p.stack[len(p.stack)-1]

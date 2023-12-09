@@ -6,12 +6,11 @@ package markdown
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
-	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -39,8 +38,11 @@ func TestToHTML(t *testing.T) {
 			}
 
 			var p Parser
-			if err := setParserOptions(&p, a.Comment); err != nil {
-				t.Fatal(err)
+			if len(a.Files) > 0 && a.Files[0].Name == "parser.json" {
+				if err := json.Unmarshal(a.Files[0].Data, &p); err != nil {
+					t.Fatal(err)
+				}
+				a.Files = a.Files[1:]
 			}
 
 			var ncase, npass int
@@ -112,41 +114,6 @@ func encode(s string) string {
 		s += "^D\n"
 	}
 	return s
-}
-
-// setParserOptions extracts lines of the form
-//
-//	key: value
-//
-// from data and sets the corresponding options on the Parser.
-func setParserOptions(p *Parser, data []byte) error {
-	for _, line := range strings.Split(string(data), "\n") {
-		if strings.HasPrefix(line, "//") {
-			continue
-		}
-		key, value, found := strings.Cut(line, ":")
-		if !found {
-			continue
-		}
-		value = strings.TrimSpace(value)
-		switch key {
-		case "HeadingIDs":
-			b, err := strconv.ParseBool(value)
-			if err != nil {
-				return err
-			}
-			p.HeadingIDs = b
-		case "Strikethrough":
-			b, err := strconv.ParseBool(value)
-			if err != nil {
-				return err
-			}
-			p.Strikethrough = b
-		default:
-			return fmt.Errorf("unknown option: %q", key)
-		}
-	}
-	return nil
 }
 
 func TestToMarkdown(t *testing.T) {

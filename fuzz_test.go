@@ -29,6 +29,9 @@ func FuzzGoldmark(f *testing.F) {
 		if err != nil {
 			f.Fatal(err)
 		}
+		if len(a.Files) > 0 && a.Files[0].Name == "parser.json" {
+			a.Files = a.Files[1:]
+		}
 		for i := 0; i+2 <= len(a.Files); i += 2 {
 			md := a.Files[i]
 			html := a.Files[i+1]
