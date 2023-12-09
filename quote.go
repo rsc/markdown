@@ -36,7 +36,7 @@ func trimQuote(s line) (line, bool) {
 
 type quoteBuilder struct{}
 
-func newQuote(p *Parser, s line) (line, bool) {
+func newQuote(p *parseState, s line) (line, bool) {
 	if line, ok := trimQuote(s); ok {
 		p.addBlock(new(quoteBuilder))
 		return line, true
@@ -44,7 +44,7 @@ func newQuote(p *Parser, s line) (line, bool) {
 	return s, false
 }
 
-func (b *quoteBuilder) extend(p *Parser, s line) (line, bool) {
+func (b *quoteBuilder) extend(p *parseState, s line) (line, bool) {
 	return trimQuote(s)
 }
 

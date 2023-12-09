@@ -77,7 +77,7 @@ type buildState interface {
 }
 
 type blockBuilder interface {
-	extend(p *Parser, s line) (line, bool)
+	extend(p *parseState, s line) (line, bool)
 	build(buildState) Block
 }
 
@@ -93,12 +93,12 @@ type itemBuilder struct {
 	haveContent bool
 }
 
-func (p *Parser) last() Block {
+func (p *parseState) last() Block {
 	ob := &p.stack[len(p.stack)-1]
 	return ob.inner[len(ob.inner)-1]
 }
 
-func (p *Parser) deleteLast() {
+func (p *parseState) deleteLast() {
 	ob := &p.stack[len(p.stack)-1]
 	ob.inner = ob.inner[:len(ob.inner)-1]
 }
@@ -136,7 +136,7 @@ func (b *Text) printMarkdown(buf *bytes.Buffer, s mdState) {
 type rootBuilder struct{}
 
 func (b *rootBuilder) build(p buildState) Block {
-	return &Document{p.pos(), p.blocks(), p.(*Parser).links}
+	return &Document{p.pos(), p.blocks(), p.(*parseState).links}
 }
 
 type Document struct {
@@ -148,6 +148,7 @@ type Document struct {
 // A Parser is a Markdown parser.
 // The exported fields in the struct can be filled in before calling
 // [Parser.Parse] in order to customize the details of the parsing process.
+// A Parser is safe for concurrent use by multiple goroutines.
 type Parser struct {
 	// HeadingIDs determines whether the parser should accept
 	// the extended syntax for HTML "id" attributes on headings.
@@ -156,11 +157,11 @@ type Parser struct {
 	// will render as the HTML
 	//    <h2 id="overview">Overview</h2>
 	HeadingIDs bool
-
-	parseState
 }
 
 type parseState struct {
+	*Parser
+
 	root      *Document
 	links     map[string]*Link
 	lineno    int
@@ -175,29 +176,29 @@ type parseState struct {
 	texts []*Text
 }
 
-func (p *Parser) newText(pos Position, text string) *Text {
+func (p *parseState) newText(pos Position, text string) *Text {
 	b := &Text{Position: pos, raw: text}
 	p.texts = append(p.texts, b)
 	return b
 }
 
-func (p *Parser) blocks() []Block {
+func (p *parseState) blocks() []Block {
 	b := &p.stack[len(p.stack)-1]
 	return b.inner
 }
 
-func (p *Parser) pos() Position {
+func (p *parseState) pos() Position {
 	b := &p.stack[len(p.stack)-1]
 	return b.pos
 }
 
 func (p *Parser) Parse(text string) *Document {
-	// Reset state so the Parser can be reused.
-	p.parseState = parseState{}
+	var ps parseState
+	ps.Parser = p
 	text = strings.ReplaceAll(text, "\x00", "\uFFFD")
 
-	p.lineDepth = -1
-	p.addBlock(&rootBuilder{})
+	ps.lineDepth = -1
+	ps.addBlock(&rootBuilder{})
 	for text != "" {
 		var ln string
 		i := strings.Index(text, "\n")
@@ -215,32 +216,32 @@ func (p *Parser) Parse(text string) *Document {
 		default:
 			ln, text = text, ""
 		}
-		p.lineno++
-		p.addLine(line{text: ln})
+		ps.lineno++
+		ps.addLine(line{text: ln})
 	}
-	p.trimStack(0)
+	ps.trimStack(0)
 
-	for _, t := range p.texts {
-		t.Inline = p.inline(t.raw)
+	for _, t := range ps.texts {
+		t.Inline = ps.inline(t.raw)
 	}
 
-	return p.root
+	return ps.root
 }
 
-func (p *Parser) curB() blockBuilder {
+func (p *parseState) curB() blockBuilder {
 	if p.lineDepth < len(p.stack) {
 		return p.stack[p.lineDepth].builder
 	}
 	return nil
 }
 
-func (p *Parser) nextB() blockBuilder {
+func (p *parseState) nextB() blockBuilder {
 	if p.lineDepth+1 < len(p.stack) {
 		return p.stack[p.lineDepth+1].builder
 	}
 	return nil
 }
-func (p *Parser) trimStack(depth int) {
+func (p *parseState) trimStack(depth int) {
 	if len(p.stack) < depth {
 		panic("trimStack")
 	}
@@ -249,7 +250,7 @@ func (p *Parser) trimStack(depth int) {
 	}
 }
 
-func (p *Parser) addBlock(c blockBuilder) {
+func (p *parseState) addBlock(c blockBuilder) {
 	p.trimStack(p.lineDepth + 1)
 	p.stack = append(p.stack, openBlock{})
 	ob := &p.stack[len(p.stack)-1]
@@ -258,20 +259,20 @@ func (p *Parser) addBlock(c blockBuilder) {
 	ob.pos.EndLine = p.lineno
 }
 
-func (p *Parser) doneBlock(b Block) {
+func (p *parseState) doneBlock(b Block) {
 	p.trimStack(p.lineDepth + 1)
 	ob := &p.stack[len(p.stack)-1]
 	ob.inner = append(ob.inner, b)
 }
 
-func (p *Parser) para() *paraBuilder {
+func (p *parseState) para() *paraBuilder {
 	if b, ok := p.stack[len(p.stack)-1].builder.(*paraBuilder); ok {
 		return b
 	}
 	return nil
 }
 
-func (p *Parser) closeBlock() Block {
+func (p *parseState) closeBlock() Block {
 	b := &p.stack[len(p.stack)-1]
 	if b.builder == nil {
 		println("closeBlock", len(p.stack)-1)
@@ -288,11 +289,11 @@ func (p *Parser) closeBlock() Block {
 	return blk
 }
 
-func (p *Parser) link(label string) *Link {
+func (p *parseState) link(label string) *Link {
 	return p.links[label]
 }
 
-func (p *Parser) defineLink(label string, link *Link) {
+func (p *parseState) defineLink(label string, link *Link) {
 	if p.links == nil {
 		p.links = make(map[string]*Link)
 	}
@@ -306,7 +307,7 @@ type line struct {
 	text   string
 }
 
-func (p *Parser) addLine(s line) {
+func (p *parseState) addLine(s line) {
 	// Process continued prefixes.
 	p.lineDepth = 0
 	for ; p.lineDepth+1 < len(p.stack); p.lineDepth++ {
@@ -343,11 +344,11 @@ Prefixes:
 	newPara(p, s)
 }
 
-func (c *rootBuilder) extend(p *Parser, s line) (line, bool) {
+func (c *rootBuilder) extend(p *parseState, s line) (line, bool) {
 	panic("root extend")
 }
 
-var news = []func(*Parser, line) (line, bool){
+var news = []func(*parseState, line) (line, bool){
 	newQuote,
 	newATXHeading,
 	newSetextHeading,

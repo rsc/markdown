@@ -81,7 +81,7 @@ func (b *CodeBlock) printMarkdown(buf *bytes.Buffer, s mdState) {
 	}
 }
 
-func newPre(p *Parser, s line) (line, bool) {
+func newPre(p *parseState, s line) (line, bool) {
 	peek2 := s
 	if p.para() == nil && peek2.trimSpace(4, 4, false) && !peek2.isBlank() {
 		b := &preBuilder{ /*indent: strings.TrimSuffix(s.string(), peek2.string())*/ }
@@ -92,7 +92,7 @@ func newPre(p *Parser, s line) (line, bool) {
 	return s, false
 }
 
-func newFence(p *Parser, s line) (line, bool) {
+func newFence(p *parseState, s line) (line, bool) {
 	var fence, info string
 	var n int
 	peek := s
@@ -145,7 +145,7 @@ type preBuilder struct {
 	text   []string
 }
 
-func (c *preBuilder) extend(p *Parser, s line) (line, bool) {
+func (c *preBuilder) extend(p *parseState, s line) (line, bool) {
 	if !s.trimSpace(4, 4, true) {
 		return s, false
 	}
@@ -164,7 +164,7 @@ type fenceBuilder struct {
 	text  []string
 }
 
-func (c *fenceBuilder) extend(p *Parser, s line) (line, bool) {
+func (c *fenceBuilder) extend(p *parseState, s line) (line, bool) {
 	var fence, info string
 	var n int
 	if t := s; t.trimFence(&fence, &info, &n) && strings.HasPrefix(fence, c.fence) && info == "" {

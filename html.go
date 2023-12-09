@@ -38,7 +38,7 @@ type htmlBuilder struct {
 	endFunc  func(string) bool
 }
 
-func (c *htmlBuilder) extend(p *Parser, s line) (line, bool) {
+func (c *htmlBuilder) extend(p *parseState, s line) (line, bool) {
 	if c.endBlank && s.isBlank() {
 		return s, false
 	}
@@ -57,7 +57,7 @@ func (c *htmlBuilder) build(p buildState) Block {
 	}
 }
 
-func newHTML(p *Parser, s line) (line, bool) {
+func newHTML(p *parseState, s line) (line, bool) {
 	peek := s
 	if p.startHTML(&peek) {
 		return line{}, true
@@ -65,7 +65,7 @@ func newHTML(p *Parser, s line) (line, bool) {
 	return s, false
 }
 
-func (p *Parser) startHTML(s *line) bool {
+func (p *parseState) startHTML(s *line) bool {
 	tt := *s
 	tt.trimSpace(0, 3, false)
 	if tt.peek() != '<' {

@@ -44,7 +44,7 @@ func (b *Heading) printMarkdown(buf *bytes.Buffer, s mdState) {
 	}
 }
 
-func newATXHeading(p *Parser, s line) (line, bool) {
+func newATXHeading(p *parseState, s line) (line, bool) {
 	peek := s
 	var n int
 	if peek.trimHeading(&n) {
@@ -90,7 +90,7 @@ func extractID(s string) (id, s2 string) {
 	return s[i+2 : j], s[:i]
 }
 
-func newSetextHeading(p *Parser, s line) (line, bool) {
+func newSetextHeading(p *parseState, s line) (line, bool) {
 	var n int
 	peek := s
 	if p.nextB() == p.para() && peek.trimSetext(&n) {

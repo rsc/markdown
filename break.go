@@ -23,7 +23,7 @@ func (b *ThematicBreak) printMarkdown(buf *bytes.Buffer, s mdState) {
 	buf.WriteByte('\n')
 }
 
-func newHR(p *Parser, s line) (line, bool) {
+func newHR(p *parseState, s line) (line, bool) {
 	if isHR(s) {
 		p.doneBlock(&ThematicBreak{Position{p.lineno, p.lineno}, s.string()})
 		return line{}, true

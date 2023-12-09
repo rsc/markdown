@@ -194,18 +194,18 @@ func (x *Emph) PrintText(buf *bytes.Buffer) {
 	}
 }
 
-func (p *Parser) emit(i int) {
+func (p *parseState) emit(i int) {
 	if p.emitted < i {
 		p.list = append(p.list, &Plain{p.s[p.emitted:i]})
 		p.emitted = i
 	}
 }
 
-func (p *Parser) skip(i int) {
+func (p *parseState) skip(i int) {
 	p.emitted = i
 }
 
-func (p *Parser) inline(s string) []Inline {
+func (p *parseState) inline(s string) []Inline {
 	s = strings.Trim(s, " \t")
 	// Scan text looking for inlines.
 	// Leaf inlines are converted immediately.
@@ -280,7 +280,7 @@ func (p *Parser) inline(s string) []Inline {
 	return p.list
 }
 
-func (p *Parser) emph(dst, src []Inline) []Inline {
+func (p *parseState) emph(dst, src []Inline) []Inline {
 	var stack [2][]*emphPlain
 	stackOf := func(c byte) int {
 		if c == '*' {
@@ -592,7 +592,7 @@ func isUnicodePunct(r rune) bool {
 	return unicode.In(r, unicode.Punct)
 }
 
-func (p *Parser) parseLinkClose(s string, i int, open *openPlain) (*Link, int, bool) {
+func (p *parseState) parseLinkClose(s string, i int, open *openPlain) (*Link, int, bool) {
 	if i+1 < len(s) {
 		switch s[i+1] {
 		case '(':
