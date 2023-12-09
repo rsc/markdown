@@ -136,6 +136,12 @@ func setParserOptions(p *Parser, data []byte) error {
 				return err
 			}
 			p.HeadingIDs = b
+		case "Strikethrough":
+			b, err := strconv.ParseBool(value)
+			if err != nil {
+				return err
+			}
+			p.Strikethrough = b
 		default:
 			return fmt.Errorf("unknown option: %q", key)
 		}

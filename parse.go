@@ -150,13 +150,18 @@ type Document struct {
 // [Parser.Parse] in order to customize the details of the parsing process.
 // A Parser is safe for concurrent use by multiple goroutines.
 type Parser struct {
-	// HeadingIDs determines whether the parser should accept
-	// the extended syntax for HTML "id" attributes on headings.
+	// HeadingIDs determines whether the parser accepts
+	// the {#hdr} syntax for an HTML id="hdr" attribute on headings.
 	// For example, if HeadingIDs is true then the Markdown
 	//    ## Overview {#overview}
 	// will render as the HTML
 	//    <h2 id="overview">Overview</h2>
 	HeadingIDs bool
+
+	// Strikethrough determines whether the parser accepts
+	// ~abc~ and ~~abc~~ as strikethrough syntax, producing
+	// <del>abc</del> in HTML.
+	Strikethrough bool
 }
 
 type parseState struct {

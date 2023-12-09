@@ -134,8 +134,8 @@ func (x *Code) PrintText(buf *bytes.Buffer) {
 }
 
 type Strong struct {
-	Inner []Inline
-	Char  byte // '_' or '*'
+	Marker string
+	Inner  []Inline
 }
 
 func (x *Strong) Inline() {
@@ -150,13 +150,11 @@ func (x *Strong) PrintHTML(buf *bytes.Buffer) {
 }
 
 func (x *Strong) printMarkdown(buf *bytes.Buffer) {
-	buf.WriteByte(x.Char)
-	buf.WriteByte(x.Char)
+	buf.WriteString(x.Marker)
 	for _, c := range x.Inner {
 		c.printMarkdown(buf)
 	}
-	buf.WriteByte(x.Char)
-	buf.WriteByte(x.Char)
+	buf.WriteString(x.Marker)
 }
 
 func (x *Strong) PrintText(buf *bytes.Buffer) {
@@ -165,9 +163,40 @@ func (x *Strong) PrintText(buf *bytes.Buffer) {
 	}
 }
 
+type Del struct {
+	Marker string
+	Inner  []Inline
+}
+
+func (x *Del) Inline() {
+
+}
+
+func (x *Del) PrintHTML(buf *bytes.Buffer) {
+	buf.WriteString("<del>")
+	for _, c := range x.Inner {
+		c.PrintHTML(buf)
+	}
+	buf.WriteString("</del>")
+}
+
+func (x *Del) printMarkdown(buf *bytes.Buffer) {
+	buf.WriteString(x.Marker)
+	for _, c := range x.Inner {
+		c.printMarkdown(buf)
+	}
+	buf.WriteString(x.Marker)
+}
+
+func (x *Del) PrintText(buf *bytes.Buffer) {
+	for _, c := range x.Inner {
+		c.PrintText(buf)
+	}
+}
+
 type Emph struct {
-	Inner []Inline
-	Char  byte // '_' or '*'
+	Marker string
+	Inner  []Inline
 }
 
 func (*Emph) Inline() {}
@@ -181,11 +210,11 @@ func (x *Emph) PrintHTML(buf *bytes.Buffer) {
 }
 
 func (x *Emph) printMarkdown(buf *bytes.Buffer) {
-	buf.WriteByte(x.Char)
+	buf.WriteString(x.Marker)
 	for _, c := range x.Inner {
 		c.printMarkdown(buf)
 	}
-	buf.WriteByte(x.Char)
+	buf.WriteString(x.Marker)
 }
 
 func (x *Emph) PrintText(buf *bytes.Buffer) {
@@ -232,6 +261,10 @@ func (p *parseState) inline(s string) []Inline {
 			parser = parseImageOpen
 		case '_', '*':
 			parser = parseEmph
+		case '~':
+			if p.Strikethrough {
+				parser = parseEmph
+			}
 		case '\n': // TODO what about eof
 			parser = parseBreak
 		case '&':
@@ -309,6 +342,7 @@ func (p *parseState) emph(dst, src []Inline) []Inline {
 			dst = append(dst, src[i])
 			continue
 		}
+		strike := p.Text[0] == '~'
 		if p.canClose {
 			stk := &stack[stackOf(p.Text[0])]
 		Loop:
@@ -327,7 +361,7 @@ func (p *parseState) emph(dst, src []Inline) []Inline {
 						// emph
 						d = 1
 					}
-					x := &Emph{Char: p.Text[0], Inner: append([]Inline(nil), dst[start.i+1:]...)}
+					x := &Emph{Marker: p.Text[:d], Inner: append([]Inline(nil), dst[start.i+1:]...)}
 					start.Text = start.Text[:len(start.Text)-d]
 					p.Text = p.Text[d:]
 					if start.Text == "" {
@@ -336,7 +370,9 @@ func (p *parseState) emph(dst, src []Inline) []Inline {
 						dst = dst[:start.i+1]
 					}
 					trimStack()
-					if d == 2 {
+					if strike {
+						dst = append(dst, (*Del)(x))
+					} else if d == 2 {
 						dst = append(dst, (*Strong)(x))
 					} else {
 						dst = append(dst, x)
@@ -502,6 +538,9 @@ func parseEmph(s string, i int) (Inline, int, int, bool) {
 	for j < len(s) && s[j] == c {
 		j++
 	}
+	if c == '~' && j-i > 2 {
+		return &Plain{s[i:j]}, i, j, true
+	}
 
 	var before, after rune
 	if i == 0 {
@@ -537,7 +576,7 @@ func parseEmph(s string, i int) (Inline, int, int, bool) {
 
 	var canOpen, canClose bool
 
-	if c == '*' {
+	if c == '*' || c == '~' {
 		// “A single * character can open emphasis iff
 		// it is part of a left-flanking delimiter run.”
 
