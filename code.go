@@ -23,7 +23,19 @@ func (b *CodeBlock) PrintHTML(buf *bytes.Buffer) {
 	}
 	buf.WriteString("<pre><code")
 	if b.Info != "" {
-		fmt.Fprintf(buf, " class=\"language-%s\"", htmlQuoteEscaper.Replace(b.Info))
+		// https://spec.commonmark.org/0.30/#info-string
+		// “The first word of the info string is typically used to
+		// specify the language of the code sample...”
+		// No definition of what “first word” means though.
+		// The Dingus splits on isUnicodeSpace, but Goldmark only uses space.
+		lang := b.Info
+		for i, c := range lang {
+			if isUnicodeSpace(c) {
+				lang = lang[:i]
+				break
+			}
+		}
+		fmt.Fprintf(buf, " class=\"language-%s\"", htmlQuoteEscaper.Replace(lang))
 	}
 	buf.WriteString(">")
 	if b.Fence == "" { // TODO move
@@ -86,6 +98,7 @@ func newPre(p *parseState, s line) (line, bool) {
 	if p.para() == nil && peek2.trimSpace(4, 4, false) && !peek2.isBlank() {
 		b := &preBuilder{ /*indent: strings.TrimSuffix(s.string(), peek2.string())*/ }
 		p.addBlock(b)
+		p.corner = p.corner || peek2.nl != '\n' // goldmark does not normalize to \n
 		b.text = append(b.text, peek2.string())
 		return line{}, true
 	}
@@ -97,6 +110,24 @@ func newFence(p *parseState, s line) (line, bool) {
 	var n int
 	peek := s
 	if peek.trimFence(&fence, &info, &n) {
+		if fence[0] == '~' && info != "" {
+			// goldmark does not handle info after ~~~
+			p.corner = true
+		} else if info != "" && !isLetter(info[0]) {
+			// goldmark does not allow numbered info.
+			// goldmark does not treat a tab as introducing a new word.
+			p.corner = true
+		}
+		for _, c := range info {
+			if isUnicodeSpace(c) {
+				if c != ' ' {
+					// goldmark only breaks on space
+					p.corner = true
+				}
+				break
+			}
+		}
+
 		p.addBlock(&fenceBuilder{fence, info, n, nil})
 		return line{}, true
 	}
@@ -126,10 +157,7 @@ func (s *line) trimFence(fence, info *string, n *int) bool {
 		if c == '`' && strings.Contains(txt, "`") {
 			return false
 		}
-		i := strings.IndexAny(txt, " \t")
-		if i >= 0 {
-			txt = txt[:i]
-		}
+		txt = strings.Trim(txt, " \t")
 		*info = txt
 
 		*fence = f[:n]
@@ -150,6 +178,7 @@ func (c *preBuilder) extend(p *parseState, s line) (line, bool) {
 		return s, false
 	}
 	c.text = append(c.text, s.string())
+	p.corner = p.corner || s.nl != '\n' // goldmark does not normalize to \n
 	return line{}, true
 }
 
@@ -170,8 +199,12 @@ func (c *fenceBuilder) extend(p *parseState, s line) (line, bool) {
 	if t := s; t.trimFence(&fence, &info, &n) && strings.HasPrefix(fence, c.fence) && info == "" {
 		return line{}, false
 	}
-	s.trimSpace(0, c.n, false)
+	if !s.trimSpace(c.n, c.n, false) {
+		p.corner = true // goldmark mishandles fenced blank lines with not enough spaces
+		s.trimSpace(0, c.n, false)
+	}
 	c.text = append(c.text, s.string())
+	p.corner = p.corner || s.nl != '\n' // goldmark does not normalize to \n
 	return line{}, true
 }
 

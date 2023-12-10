@@ -23,13 +23,18 @@ func parseLinkRefDef(p buildState, s string) (int, bool) {
 	// which if it is present must be separated from the link destination
 	// by spaces or tabs. No further character may occur.”
 	i := skipSpace(s, 0)
-	label, i, ok := parseLinkLabel(s, i)
+	label, i, ok := parseLinkLabel(p.(*parseState), s, i)
 	if !ok || i >= len(s) || s[i] != ':' {
 		return 0, false
 	}
 	i = skipSpace(s, i+1)
+	suf := s[i:]
 	dest, i, ok := parseLinkDest(s, i)
 	if !ok {
+		if suf != "" && suf[0] == '<' {
+			// Goldmark treats <<> as a link definition.
+			p.(*parseState).corner = true
+		}
 		return 0, false
 	}
 	moved := false
@@ -49,6 +54,7 @@ func parseLinkRefDef(p buildState, s string) (int, bool) {
 
 	var title string
 	var titleChar byte
+	var corner bool
 	if moved {
 		for j < len(s) && (s[j] == ' ' || s[j] == '\t') {
 			j++
@@ -59,6 +65,11 @@ func parseLinkRefDef(p buildState, s string) (int, bool) {
 			}
 			if j >= len(s) || s[j] == '\n' {
 				i = j
+				if t == "" {
+					// Goldmark adds title="" in this case.
+					// We do not, nor does the Dingus.
+					corner = true
+				}
 				title = t
 				titleChar = c
 			}
@@ -75,7 +86,7 @@ func parseLinkRefDef(p buildState, s string) (int, bool) {
 
 	label = normalizeLabel(label)
 	if p.link(label) == nil {
-		p.defineLink(label, &Link{URL: dest, Title: title, TitleChar: titleChar})
+		p.defineLink(label, &Link{URL: dest, Title: title, TitleChar: titleChar, corner: corner})
 	}
 	return i, true
 }
@@ -104,7 +115,7 @@ func parseLinkTitle(s string, i int) (title string, char byte, next int, found b
 	return "", 0, 0, false
 }
 
-func parseLinkLabel(s string, i int) (string, int, bool) {
+func parseLinkLabel(p *parseState, s string, i int) (string, int, bool) {
 	// “A link label begins with a left bracket ([) and ends with
 	// the first right bracket (]) that is not backslash-escaped.
 	// Between these brackets there must be at least one character
@@ -119,6 +130,8 @@ func parseLinkLabel(s string, i int) (string, int, bool) {
 	for ; j < len(s); j++ {
 		if s[j] == ']' {
 			if j-(i+1) > 999 {
+				// Goldmark does not apply 999 limit.
+				p.corner = true
 				break
 			}
 			if label := strings.Trim(s[i+1:j], " \t\n"); label != "" {
@@ -369,6 +382,7 @@ type Link struct {
 	URL       string
 	Title     string
 	TitleChar byte // ', " or )
+	corner    bool
 }
 
 func (*Link) Inline() {}
@@ -419,6 +433,7 @@ type Image struct {
 	URL       string
 	Title     string
 	TitleChar byte
+	corner    bool
 }
 
 func (*Image) Inline() {}

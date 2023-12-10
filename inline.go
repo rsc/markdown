@@ -247,7 +247,7 @@ func (p *parseState) inline(s string) []Inline {
 	var lastLinkOpen int
 	i := 0
 	for i < len(s) {
-		var parser func(string, int) (Inline, int, int, bool)
+		var parser func(*parseState, string, int) (Inline, int, int, bool)
 		switch s[i] {
 		case '\\':
 			parser = parseEscape
@@ -271,7 +271,7 @@ func (p *parseState) inline(s string) []Inline {
 			parser = parseHTMLEntity
 		}
 		if parser != nil {
-			if x, start, end, ok := parser(s, i); ok {
+			if x, start, end, ok := parser(p, s, i); ok {
 				p.emit(start)
 				if _, ok := x.(*openPlain); ok {
 					opens = append(opens, len(p.list))
@@ -288,6 +288,7 @@ func (p *parseState) inline(s string) []Inline {
 			opens = opens[:len(opens)-1]
 			if open.Text[0] == '!' || lastLinkOpen <= open.i {
 				if x, end, ok := p.parseLinkClose(s, i, open); ok {
+					p.corner = p.corner || x.corner || linkCorner(x.URL)
 					p.emit(i)
 					x.Inner = p.emph(nil, p.list[oi+1:])
 					if open.Text[0] == '!' {
@@ -442,13 +443,16 @@ func isPunct(c byte) bool {
 	return '!' <= c && c <= '/' || ':' <= c && c <= '@' || '[' <= c && c <= '`' || '{' <= c && c <= '~'
 }
 
-func parseEscape(s string, i int) (Inline, int, int, bool) {
+func parseEscape(p *parseState, s string, i int) (Inline, int, int, bool) {
 	if i+1 < len(s) {
 		c := s[i+1]
 		if isPunct(c) {
 			return &Escaped{Plain{s[i+1 : i+2]}}, i, i + 2, true
 		}
 		if c == '\n' { // TODO what about eof
+			if i > 0 && s[i-1] == '\\' {
+				p.corner = true // goldmark mishandles \\\ newline
+			}
 			end := i + 2
 			for end < len(s) && (s[end] == ' ' || s[end] == '\t') {
 				end++
@@ -459,7 +463,7 @@ func parseEscape(s string, i int) (Inline, int, int, bool) {
 	return nil, 0, 0, false
 }
 
-func parseCodeSpan(s string, i int) (Inline, int, int, bool) {
+func parseCodeSpan(_ *parseState, s string, i int) (Inline, int, int, bool) {
 	start := i
 	// Count leading backticks. Need to find that many again.
 	n := 1
@@ -497,14 +501,14 @@ func parseCodeSpan(s string, i int) (Inline, int, int, bool) {
 	return &Plain{s[i : i+n]}, start, i + n, true
 }
 
-func parseAutoLinkOrHTML(s string, i int) (Inline, int, int, bool) {
+func parseAutoLinkOrHTML(p *parseState, s string, i int) (Inline, int, int, bool) {
 	if x, end, ok := parseAutoLinkURI(s, i); ok {
 		return x, i, end, true
 	}
 	if x, end, ok := parseAutoLinkEmail(s, i); ok {
 		return x, i, end, true
 	}
-	if x, end, ok := parseHTMLTag(s, i); ok {
+	if x, end, ok := parseHTMLTag(p, s, i); ok {
 		return x, i, end, true
 	}
 	return nil, 0, 0, false
@@ -521,22 +525,28 @@ func isLetterDigit(c byte) bool {
 	return 'A' <= c && c <= 'Z' || 'a' <= c && c <= 'z' || '0' <= c && c <= '9'
 }
 
-func parseLinkOpen(s string, i int) (Inline, int, int, bool) {
+func parseLinkOpen(_ *parseState, s string, i int) (Inline, int, int, bool) {
 	return &openPlain{Plain{s[i : i+1]}, i + 1}, i, i + 1, true
 }
 
-func parseImageOpen(s string, i int) (Inline, int, int, bool) {
+func parseImageOpen(_ *parseState, s string, i int) (Inline, int, int, bool) {
 	if i+1 < len(s) && s[i+1] == '[' {
 		return &openPlain{Plain{s[i : i+2]}, i + 2}, i, i + 2, true
 	}
 	return nil, 0, 0, false
 }
 
-func parseEmph(s string, i int) (Inline, int, int, bool) {
+func parseEmph(p *parseState, s string, i int) (Inline, int, int, bool) {
 	c := s[i]
 	j := i + 1
 	for j < len(s) && s[j] == c {
 		j++
+	}
+	if c == '~' && j-i != 2 {
+		// Goldmark does not accept ~text~
+		// and incorrectly accepts ~~~text~~~.
+		// Only ~~ is correct.
+		p.corner = true
 	}
 	if c == '~' && j-i > 2 {
 		return &Plain{s[i:j]}, i, j, true
@@ -619,7 +629,7 @@ func parseEmph(s string, i int) (Inline, int, int, bool) {
 
 func isUnicodeSpace(r rune) bool {
 	if r < 0x80 {
-		return r == ' ' || r == '\t' || r == '\n'
+		return r == ' ' || r == '\t' || r == '\f' || r == '\n'
 	}
 	return unicode.In(r, unicode.Zs)
 }
@@ -639,6 +649,7 @@ func (p *parseState) parseLinkClose(s string, i int, open *openPlain) (*Link, in
 			i := skipSpace(s, i+2)
 			var dest, title string
 			var titleChar byte
+			var corner bool
 			if i < len(s) && s[i] != ')' {
 				var ok bool
 				dest, i, ok = parseLinkDest(s, i)
@@ -648,6 +659,9 @@ func (p *parseState) parseLinkClose(s string, i int, open *openPlain) (*Link, in
 				i = skipSpace(s, i)
 				if i < len(s) && s[i] != ')' {
 					title, titleChar, i, ok = parseLinkTitle(s, i)
+					if title == "" {
+						corner = true
+					}
 					if !ok {
 						break
 					}
@@ -655,19 +669,19 @@ func (p *parseState) parseLinkClose(s string, i int, open *openPlain) (*Link, in
 				}
 			}
 			if i < len(s) && s[i] == ')' {
-				return &Link{URL: dest, Title: title, TitleChar: titleChar}, i + 1, true
+				return &Link{URL: dest, Title: title, TitleChar: titleChar, corner: corner}, i + 1, true
 			}
 			// NOTE: Test malformed ( ) with shortcut reference
 			// TODO fall back on syntax error?
 
 		case '[':
 			// Full reference link - [Text][Label]
-			label, i, ok := parseLinkLabel(s, i+1)
+			label, i, ok := parseLinkLabel(p, s, i+1)
 			if !ok {
 				break
 			}
 			if link, ok := p.links[normalizeLabel(label)]; ok {
-				return &Link{URL: link.URL, Title: link.Title}, i, true
+				return &Link{URL: link.URL, Title: link.Title, corner: link.corner}, i, true
 			}
 			// Note: Could break here, but CommonMark dingus does not
 			// fall back to trying Text for [Text][Label] when Label is unknown.
@@ -683,7 +697,7 @@ func (p *parseState) parseLinkClose(s string, i int, open *openPlain) (*Link, in
 	}
 
 	if link, ok := p.links[normalizeLabel(s[open.i:i])]; ok {
-		return &Link{URL: link.URL, Title: link.Title}, end, true
+		return &Link{URL: link.URL, Title: link.Title, corner: link.corner}, end, true
 	}
 	return nil, 0, false
 }
@@ -694,4 +708,17 @@ func skipSpace(s string, i int) int {
 		i++
 	}
 	return i
+}
+
+func linkCorner(url string) bool {
+	for i := 0; i < len(url); i++ {
+		if url[i] == '%' {
+			if i+2 >= len(url) || !isHexDigit(url[i+1]) || !isHexDigit(url[i+2]) {
+				// Goldmark and the Dingus re-escape such percents as %25,
+				// but the spec does not seem to require this behavior.
+				return true
+			}
+		}
+	}
+	return false
 }

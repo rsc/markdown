@@ -61,7 +61,14 @@ func newATXHeading(p *parseState, s line) (line, bool) {
 			//    The optional closing sequence of #s must be preceded by spaces or tabs
 			//    and may be followed by spaces or tabs only.
 			// But Goldmark allows it to come after.
-			id, s = extractID(s)
+			id, s = extractID(p, s)
+
+			// Goldmark is strict about the id syntax.
+			for _, c := range id {
+				if c >= 0x80 || !isLetterDigit(byte(c)) {
+					p.corner = true
+				}
+			}
 		}
 		pos := Position{p.lineno, p.lineno}
 		p.doneBlock(&Heading{pos, n, p.newText(pos, s), id})
@@ -75,16 +82,22 @@ func newATXHeading(p *parseState, s line) (line, bool) {
 // The attribute has the form "{#...}", where the "..." can contain
 // any character other than '}'.
 // The attribute must be followed only by whitespace.
-func extractID(s string) (id, s2 string) {
+func extractID(p *parseState, s string) (id, s2 string) {
 	i := strings.LastIndexByte(s, '{')
-	if i < 0 || i == len(s)-1 {
+	if i < 0 {
 		return "", s
 	}
-	if s[i+1] != '#' {
+	if i+1 >= len(s) || s[i+1] != '#' {
+		p.corner = true // goldmark accepts {}
 		return "", s
 	}
 	j := i + strings.IndexByte(s[i:], '}')
 	if j < 0 || strings.TrimRight(s[j+1:], " \t") != "" {
+		return "", s
+	}
+	id = strings.TrimSpace(s[i+2 : j])
+	if id == "" {
+		p.corner = true // goldmark accepts {#}
 		return "", s
 	}
 	return s[i+2 : j], s[:i]

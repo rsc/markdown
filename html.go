@@ -82,8 +82,11 @@ func (p *parseState) startHTML(s *line) bool {
 	case strings.HasPrefix(t, "<![CDATA["):
 		end = "]]>"
 	case strings.HasPrefix(t, "<!") && len(t) >= 3 && isLetter(t[2]):
+		if 'a' <= t[2] && t[2] <= 'z' {
+			// Goldmark and the Dingus only accept <!UPPER> not <!lower>.
+			p.corner = true
+		}
 		end = ">"
-		// TODO 1, 7
 	}
 	if end != "" {
 		b := &htmlBuilder{endFunc: func(s string) bool { return strings.Contains(s, end) }}
@@ -111,12 +114,14 @@ func (p *parseState) startHTML(s *line) bool {
 		}
 		buf = append(buf, c)
 	}
+	var sep byte
 	if i < len(t) {
 		switch t[i] {
 		default:
 			goto Next
 		case ' ', '\t', '>':
 			// ok
+			sep = t[i]
 		case '/':
 			if i+1 >= len(t) || t[i+1] != '>' {
 				goto Next
@@ -132,6 +137,11 @@ func (p *parseState) startHTML(s *line) bool {
 		var ok bool
 		for _, name := range htmlTags {
 			if name[0] == c && len(name) == len(buf) && name == string(buf) {
+				if sep == '\t' {
+					// Goldmark recognizes space here but not tab.
+					// testdata/extra.txt 143.md
+					p.corner = true
+				}
 				ok = true
 				break
 			}
@@ -165,13 +175,17 @@ Next:
 
 	// case 7
 	if p.para() == nil {
-		if _, e, ok := parseHTMLOpenTag(t, 0); ok && skipSpace(t, e) == len(t) {
+		if _, e, ok := parseHTMLOpenTag(p, t, 0); ok && skipSpace(t, e) == len(t) {
+			if e != len(t) {
+				// Goldmark disallows trailing space
+				p.corner = true
+			}
 			b := &htmlBuilder{endBlank: true}
 			p.addBlock(b)
 			b.text = append(b.text, s.string())
 			return true
 		}
-		if _, e, ok := parseHTMLClosingTag(t, 0); ok && skipSpace(t, e) == len(t) {
+		if _, e, ok := parseHTMLClosingTag(p, t, 0); ok && skipSpace(t, e) == len(t) {
 			b := &htmlBuilder{endBlank: true}
 			p.addBlock(b)
 			b.text = append(b.text, s.string())
@@ -207,15 +221,15 @@ func hasEndPre(s string) bool {
 	return false
 }
 
-func parseHTMLTag(s string, i int) (Inline, int, bool) {
+func parseHTMLTag(p *parseState, s string, i int) (Inline, int, bool) {
 	// “An HTML tag consists of an open tag, a closing tag, an HTML comment,
 	// a processing instruction, a declaration, or a CDATA section.”
 	if i+3 <= len(s) && s[i] == '<' {
 		switch s[i+1] {
 		default:
-			return parseHTMLOpenTag(s, i)
+			return parseHTMLOpenTag(p, s, i)
 		case '/':
-			return parseHTMLClosingTag(s, i)
+			return parseHTMLClosingTag(p, s, i)
 		case '!':
 			switch s[i+2] {
 			case '-':
@@ -223,7 +237,7 @@ func parseHTMLTag(s string, i int) (Inline, int, bool) {
 			case '[':
 				return parseHTMLCDATA(s, i)
 			default:
-				return parseHTMLDecl(s, i)
+				return parseHTMLDecl(p, s, i)
 			}
 		case '?':
 			return parseHTMLProcInst(s, i)
@@ -232,24 +246,35 @@ func parseHTMLTag(s string, i int) (Inline, int, bool) {
 	return nil, 0, false
 }
 
-func parseHTMLOpenTag(s string, i int) (Inline, int, bool) {
+func parseHTMLOpenTag(p *parseState, s string, i int) (Inline, int, bool) {
 	if i >= len(s) || s[i] != '<' {
 		return nil, 0, false
 	}
 	// “An open tag consists of a < character, a tag name, zero or more attributes,
 	// optional spaces, tabs, and up to one line ending, an optional / character, and a > character.”
-	if _, j, ok := parseTagName(s, i+1); ok {
+	if name, j, ok := parseTagName(s, i+1); ok {
+		switch name {
+		case "pre", "script", "style", "textarea":
+			// Goldmark treats these as starting a new HTMLBlock
+			// and ending the paragraph they appear in.
+			p.corner = true
+		}
 		for {
 			if j >= len(s) || s[j] != ' ' && s[j] != '\t' && s[j] != '\n' && s[j] != '/' && s[j] != '>' {
 				return nil, 0, false
 			}
-			_, k, ok := parseAttr(s, j)
+			_, k, ok := parseAttr(p, s, j)
 			if !ok {
 				break
 			}
 			j = k
 		}
-		j = skipSpace(s, j)
+		k := skipSpace(s, j)
+		if k != j {
+			// Goldmark mishandles spaces before >.
+			p.corner = true
+		}
+		j = k
 		if j < len(s) && s[j] == '/' {
 			j++
 		}
@@ -260,11 +285,15 @@ func parseHTMLOpenTag(s string, i int) (Inline, int, bool) {
 	return nil, 0, false
 }
 
-func parseHTMLClosingTag(s string, i int) (Inline, int, bool) {
+func parseHTMLClosingTag(p *parseState, s string, i int) (Inline, int, bool) {
 	// “A closing tag consists of the string </, a tag name,
 	// optional spaces, tabs, and up to one line ending, and the character >.”
 	if i+2 >= len(s) || s[i] != '<' || s[i+1] != '/' {
 		return nil, 0, false
+	}
+	if skipSpace(s, i+2) != i+2 {
+		// Goldmark allows spaces here but the spec and the Dingus do not.
+		p.corner = true
 	}
 
 	if _, j, ok := parseTagName(s, i+2); ok {
@@ -288,12 +317,12 @@ func parseTagName(s string, i int) (string, int, bool) {
 	return "", 0, false
 }
 
-func parseAttr(s string, i int) (string, int, bool) {
+func parseAttr(p *parseState, s string, i int) (string, int, bool) {
 	// “An attribute consists of spaces, tabs, and up to one line ending,
 	// an attribute name, and an optional attribute value specification.”
 	i = skipSpace(s, i)
 	if _, j, ok := parseAttrName(s, i); ok {
-		if _, k, ok := parseAttrValueSpec(s, j); ok {
+		if _, k, ok := parseAttrValueSpec(p, s, j); ok {
 			j = k
 		}
 		return s[i:j], j, true
@@ -314,7 +343,7 @@ func parseAttrName(s string, i int) (string, int, bool) {
 	return "", 0, false
 }
 
-func parseAttrValueSpec(s string, i int) (string, int, bool) {
+func parseAttrValueSpec(p *parseState, s string, i int) (string, int, bool) {
 	// “An attribute value specification consists of
 	// optional spaces, tabs, and up to one line ending,
 	// a = character,
@@ -324,6 +353,7 @@ func parseAttrValueSpec(s string, i int) (string, int, bool) {
 	if i+1 < len(s) && s[i] == '=' {
 		i = skipSpace(s, i+1)
 		if _, j, ok := parseAttrValue(s, i); ok {
+			p.corner = p.corner || strings.Contains(s[i:j], "\ufffd")
 			return s[i:j], j, true
 		}
 	}
@@ -380,11 +410,14 @@ func parseHTMLCDATA(s string, i int) (Inline, int, bool) {
 	return parseHTMLMarker(s, i, "<![CDATA[", "]]>")
 }
 
-func parseHTMLDecl(s string, i int) (Inline, int, bool) {
+func parseHTMLDecl(p *parseState, s string, i int) (Inline, int, bool) {
 	// “A declaration consists of the string <!, an ASCII letter,
 	// zero or more characters not including the character >, and the character >.”
 	if i+2 < len(s) && isLetter(s[i+2]) {
-		return parseHTMLMarker(s, i, "<", ">")
+		if 'a' <= s[i+2] && s[i+2] <= 'z' {
+			p.corner = true // goldmark requires uppercase
+		}
+		return parseHTMLMarker(s, i, "<!", ">")
 	}
 	return nil, 0, false
 }
@@ -405,7 +438,7 @@ func parseHTMLMarker(s string, i int, prefix, suffix string) (Inline, int, bool)
 	return nil, 0, false
 }
 
-func parseHTMLEntity(s string, i int) (Inline, int, int, bool) {
+func parseHTMLEntity(_ *parseState, s string, i int) (Inline, int, int, bool) {
 	start := i
 	if i+1 < len(s) && s[i+1] == '#' {
 		i += 2

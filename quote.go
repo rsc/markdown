@@ -4,7 +4,9 @@
 
 package markdown
 
-import "bytes"
+import (
+	"bytes"
+)
 
 type Quote struct {
 	Position

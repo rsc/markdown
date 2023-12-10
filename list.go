@@ -252,7 +252,13 @@ Switch:
 		// paragraph continuation text—then (a) the lines Ls must
 		// not begin with a blank line,
 		// and (b) if the list item is ordered, the start number must be 1.”
-		if list == nil && p.para() != nil && (t.isBlank() || num > 1) {
+		if list == nil && p.para() != nil && (t.isBlank() || (bullet == '.' || bullet == ')') && num != 1) {
+			// Goldmark and Dingus both seem to get this wrong
+			// (or the words above don't mean what we think they do).
+			// when the paragraph that could be continued
+			// is inside a block quote.
+			// See testdata/extra.txt 117.md.
+			p.corner = true
 			return false
 		}
 		list = &listBuilder{bullet: rune(bullet), num: num}
@@ -269,7 +275,7 @@ Switch:
 
 // GitHub task list extension
 
-func (ps *parseState) taskList(list *List) {
+func (p *parseState) taskList(list *List) {
 	for _, item := range list.Items {
 		item := item.(*Item)
 		if len(item.Blocks) == 0 {
@@ -296,6 +302,7 @@ func (ps *parseState) taskList(list *List) {
 			continue
 		}
 		if c := plain2.Text[2]; c != ' ' && c != '\t' {
+			p.corner = true // goldmark does not require the space
 			continue
 		}
 		text.Inline[0] = &Task{Checked: plain2.Text[0] == 'x'}
@@ -338,4 +345,20 @@ func (x *Task) PrintText(buf *bytes.Buffer) {
 	}
 	buf.WriteByte(']')
 	buf.WriteByte(' ')
+}
+
+func listCorner(list *List) bool {
+	for _, item := range list.Items {
+		item := item.(*Item)
+		if len(item.Blocks) == 0 {
+			// Goldmark mishandles what follows; see testdata/extra.txt 111.md.
+			return true
+		}
+		switch item.Blocks[0].(type) {
+		case *List, *ThematicBreak, *CodeBlock:
+			// Goldmark mishandles a list with various block items inside it.
+			return true
+		}
+	}
+	return false
 }

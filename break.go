@@ -78,7 +78,7 @@ func (x *SoftBreak) printMarkdown(buf *bytes.Buffer) {
 
 func (x *SoftBreak) PrintText(buf *bytes.Buffer) {}
 
-func parseBreak(s string, i int) (Inline, int, int, bool) {
+func parseBreak(_ *parseState, s string, i int) (Inline, int, int, bool) {
 	start := i
 	for start > 0 && (s[start-1] == ' ' || s[start-1] == '\t') {
 		start--

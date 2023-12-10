@@ -30,3 +30,9 @@ This will ~~~not~~~ strike.
 <p>5<em>6</em>78
 5_6_78
 5<del>6</del>78</p>
+-- 2.md --
+~~Hi~~ Hello, ~~there~~ world!
+5~~6~~78
+-- 2.html --
+<p><del>Hi</del> Hello, <del>there</del> world!
+5<del>6</del>78</p>

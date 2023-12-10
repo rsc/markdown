@@ -45,3 +45,11 @@ Goldmark fails on 11 because it doesn't like slashes or spaces in ids.
 # Heading {#a/b c}
 -- 11.html --
 <h1 id="a/b c">Heading</h1>
+-- 12.md --
+# {}
+-- 12.html --
+<h1>{}</h1>
+-- 13.md --
+# {#}
+-- 13.html --
+<h1>{#}</h1>

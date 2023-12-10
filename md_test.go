@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/yuin/goldmark"
+	gext "github.com/yuin/goldmark/extension"
 	gparser "github.com/yuin/goldmark/parser"
 	ghtml "github.com/yuin/goldmark/renderer/html"
 	"golang.org/x/tools/txtar"
@@ -38,18 +39,20 @@ func TestToHTML(t *testing.T) {
 			}
 
 			var p Parser
-			if len(a.Files) > 0 && a.Files[0].Name == "parser.json" {
-				if err := json.Unmarshal(a.Files[0].Data, &p); err != nil {
-					t.Fatal(err)
-				}
-				a.Files = a.Files[1:]
-			}
-
 			var ncase, npass int
-			for i := 0; i+2 <= len(a.Files); i += 2 {
+			for i := 0; i+2 <= len(a.Files); {
+				if a.Files[i].Name == "parser.json" {
+					p = Parser{}
+					if err := json.Unmarshal(a.Files[i].Data, &p); err != nil {
+						t.Fatal(err)
+					}
+					i++
+					continue
+				}
 				ncase++
 				md := a.Files[i]
 				html := a.Files[i+1]
+				i += 2
 				name := strings.TrimSuffix(md.Name, ".md")
 				if name != strings.TrimSuffix(html.Name, ".html") {
 					t.Fatalf("mismatched file pair: %s and %s", md.Name, html.Name)
@@ -59,7 +62,8 @@ func TestToHTML(t *testing.T) {
 					doc := p.Parse(decode(string(md.Data)))
 					h := encode(ToHTML(doc))
 					if h != string(html.Data) {
-						t.Fatalf("input %q\nparse:\n%s\nhave %q\nwant %q\ndingus: (https://spec.commonmark.org/dingus/?text=%s)", md.Data, dump(doc), h, html.Data, strings.ReplaceAll(url.QueryEscape(decode(string(md.Data))), "+", "%20"))
+						q := strings.ReplaceAll(url.QueryEscape(decode(string(md.Data))), "+", "%20")
+						t.Fatalf("input %q\nparse:\n%s\nhave %q\nwant %q\ndingus: (https://spec.commonmark.org/dingus/?text=%s)\ngithub: (https://github.com/rsc/tmp/issues/new?body=%s)", md.Data, dump(doc), h, html.Data, q, q)
 					}
 					npass++
 				})
@@ -68,24 +72,26 @@ func TestToHTML(t *testing.T) {
 					continue
 				}
 				t.Run("goldmark/"+name, func(t *testing.T) {
-					opts := []goldmark.Option{goldmark.WithRendererOptions(ghtml.WithUnsafe())}
-					if p.HeadingIDs {
-						opts = append(opts, goldmark.WithParserOptions(gparser.WithHeadingAttribute()))
+					in := decode(string(md.Data))
+					_, corner := p.parse(in)
+					if corner {
+						t.Skip("known corner case")
 					}
-					gm := goldmark.New(opts...)
+					gm := goldmarkParser(&p)
 					var buf bytes.Buffer
-					if err := gm.Convert([]byte(decode(string(md.Data))), &buf); err != nil {
+					if err := gm.Convert([]byte(in), &buf); err != nil {
 						t.Fatal(err)
 					}
 					if buf.Len() > 0 && buf.Bytes()[buf.Len()-1] != '\n' {
 						buf.WriteByte('\n')
 					}
-					want := string(html.Data)
+					want := decode(string(html.Data))
 					want = strings.ReplaceAll(want, " />", ">")
-					out := encode(buf.String())
+					out := buf.String()
 					out = strings.ReplaceAll(out, " />", ">")
+					q := strings.ReplaceAll(url.QueryEscape(decode(string(md.Data))), "+", "%20")
 					if out != want {
-						t.Fatalf("\n    - input: ``%q``\n    - output: ``%q``\n    - golden: ``%q``\n    - [dingus](https://spec.commonmark.org/dingus/?text=%s)", md.Data, out, want, strings.ReplaceAll(url.QueryEscape(decode(string(md.Data))), "+", "%20"))
+						t.Fatalf("\n    - input: ``%q``\n    - output: ``%q``\n    - golden: ``%q``\n    - [dingus](https://spec.commonmark.org/dingus/?text=%s)\n    - [github](https://github.com/rsc/tmp/issues/new?body=%s)", in, out, want, q, q)
 					}
 					npass++
 
@@ -94,6 +100,22 @@ func TestToHTML(t *testing.T) {
 			t.Logf("%d/%d pass", npass, ncase)
 		})
 	}
+}
+
+func goldmarkParser(p *Parser) goldmark.Markdown {
+	opts := []goldmark.Option{
+		goldmark.WithRendererOptions(ghtml.WithUnsafe()),
+	}
+	if p.HeadingIDs {
+		opts = append(opts, goldmark.WithParserOptions(gparser.WithHeadingAttribute()))
+	}
+	if p.Strikethrough {
+		opts = append(opts, goldmark.WithExtensions(gext.Strikethrough))
+	}
+	if p.TaskListItems {
+		opts = append(opts, goldmark.WithExtensions(gext.TaskList))
+	}
+	return goldmark.New(opts...)
 }
 
 func decode(s string) string {

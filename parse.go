@@ -179,6 +179,8 @@ type parseState struct {
 	stack     []openBlock
 	lineDepth int
 
+	corner bool // noticed corner case to ignore in cross-implementation testing
+
 	// inlines
 	s       string
 	emitted int // s[:emitted] has been emitted into list
@@ -206,9 +208,17 @@ func (p *parseState) pos() Position {
 }
 
 func (p *Parser) Parse(text string) *Document {
+	d, _ := p.parse(text)
+	return d
+}
+
+func (p *Parser) parse(text string) (d *Document, corner bool) {
 	var ps parseState
 	ps.Parser = p
-	text = strings.ReplaceAll(text, "\x00", "\uFFFD")
+	if strings.Contains(text, "\x00") {
+		text = strings.ReplaceAll(text, "\x00", "\uFFFD")
+		ps.corner = true // goldmark does not replace NUL
+	}
 
 	ps.lineDepth = -1
 	ps.addBlock(&rootBuilder{})
@@ -216,21 +226,25 @@ func (p *Parser) Parse(text string) *Document {
 		var ln string
 		i := strings.Index(text, "\n")
 		j := strings.Index(text, "\r")
+		var nl byte
 		switch {
 		case j >= 0 && (i < 0 || j < i): // have \r, maybe \r\n
 			ln = text[:j]
 			if i == j+1 {
 				text = text[j+2:]
+				nl = '\r' + '\n'
 			} else {
 				text = text[j+1:]
+				nl = '\r'
 			}
 		case i >= 0:
 			ln, text = text[:i], text[i+1:]
+			nl = '\n'
 		default:
 			ln, text = text, ""
 		}
 		ps.lineno++
-		ps.addLine(line{text: ln})
+		ps.addLine(line{text: ln, nl: nl})
 	}
 	ps.trimStack(0)
 
@@ -244,7 +258,7 @@ func (p *Parser) Parse(text string) *Document {
 		}
 	}
 
-	return ps.root
+	return ps.root, ps.corner
 }
 
 func (p *parseState) curB() blockBuilder {
@@ -297,8 +311,11 @@ func (p *parseState) closeBlock() Block {
 		println("closeBlock", len(p.stack)-1)
 	}
 	blk := b.builder.build(p)
-	if list, ok := blk.(*List); ok && p.TaskListItems {
-		p.lists = append(p.lists, list)
+	if list, ok := blk.(*List); ok {
+		p.corner = p.corner || listCorner(list)
+		if p.TaskListItems {
+			p.lists = append(p.lists, list)
+		}
 	}
 	p.stack = p.stack[:len(p.stack)-1]
 	if len(p.stack) > 0 {
@@ -327,6 +344,7 @@ type line struct {
 	i      int
 	tab    int
 	text   string
+	nl     byte // newline character ending this line: \r or \n or zero for EOF
 }
 
 func (p *parseState) addLine(s line) {
