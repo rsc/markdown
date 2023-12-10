@@ -1,0 +1,312 @@
+-- parser.json --
+{"AutoLinkText": true, "AutoLinkAssumeHTTP": true}
+-- gfm622.md --
+www.commonmark.org
+-- gfm622.html --
+<p><a href="http://www.commonmark.org">www.commonmark.org</a></p>
+-- gfm623.md --
+Visit www.commonmark.org/help for more information.
+-- gfm623.html --
+<p>Visit <a href="http://www.commonmark.org/help">www.commonmark.org/help</a> for more information.</p>
+-- gfm624.md --
+Visit www.commonmark.org.
+
+Visit www.commonmark.org/a.b.
+-- gfm624.html --
+<p>Visit <a href="http://www.commonmark.org">www.commonmark.org</a>.</p>
+<p>Visit <a href="http://www.commonmark.org/a.b">www.commonmark.org/a.b</a>.</p>
+-- gfm625.md --
+www.google.com/search?q=Markup+(business)
+
+www.google.com/search?q=Markup+(business)))
+
+(www.google.com/search?q=Markup+(business))
+
+(www.google.com/search?q=Markup+(business)
+-- gfm625.html --
+<p><a href="http://www.google.com/search?q=Markup+(business)">www.google.com/search?q=Markup+(business)</a></p>
+<p><a href="http://www.google.com/search?q=Markup+(business)">www.google.com/search?q=Markup+(business)</a>))</p>
+<p>(<a href="http://www.google.com/search?q=Markup+(business)">www.google.com/search?q=Markup+(business)</a>)</p>
+<p>(<a href="http://www.google.com/search?q=Markup+(business)">www.google.com/search?q=Markup+(business)</a></p>
+-- gfm626.md --
+www.google.com/search?q=(business))+ok
+-- gfm626.html --
+<p><a href="http://www.google.com/search?q=(business))+ok">www.google.com/search?q=(business))+ok</a></p>
+-- gfm627.md --
+www.google.com/search?q=commonmark&hl=en
+
+www.google.com/search?q=commonmark&hl;
+-- gfm627.html --
+<p><a href="http://www.google.com/search?q=commonmark&amp;hl=en">www.google.com/search?q=commonmark&amp;hl=en</a></p>
+<p><a href="http://www.google.com/search?q=commonmark">www.google.com/search?q=commonmark</a>&amp;hl;</p>
+-- gfm628.md --
+www.commonmark.org/he<lp
+-- gfm628.html --
+<p><a href="http://www.commonmark.org/he">www.commonmark.org/he</a>&lt;lp</p>
+-- gfm629.md --
+http://commonmark.org
+
+(Visit http://encrypted.google.com/search?q=Markup+(business))
+-- gfm629.html --
+<p><a href="http://commonmark.org">http://commonmark.org</a></p>
+<p>(Visit <a href="http://encrypted.google.com/search?q=Markup+(business)">http://encrypted.google.com/search?q=Markup+(business)</a>)</p>
+-- gfm630.md --
+foo@bar.baz
+-- gfm630.html --
+<p><a href="mailto:foo@bar.baz">foo@bar.baz</a></p>
+-- gfm631.md --
+hello@mail+xyz.example isn't valid, but hello+xyz@mail.example is.
+-- gfm631.html --
+<p>hello@mail+xyz.example isn't valid, but <a href="mailto:hello+xyz@mail.example">hello+xyz@mail.example</a> is.</p>
+-- gfm632.md --
+a.b-c_d@a.b
+
+a.b-c_d@a.b.
+
+a.b-c_d@a.b-
+
+a.b-c_d@a.b_
+-- gfm632.html --
+<p><a href="mailto:a.b-c_d@a.b">a.b-c_d@a.b</a></p>
+<p><a href="mailto:a.b-c_d@a.b">a.b-c_d@a.b</a>.</p>
+<p>a.b-c_d@a.b-</p>
+<p>a.b-c_d@a.b_</p>
+-- gfm633.md --
+mailto:foo@bar.baz
+
+mailto:a.b-c_d@a.b
+
+mailto:a.b-c_d@a.b.
+
+mailto:a.b-c_d@a.b/
+
+mailto:a.b-c_d@a.b-
+
+mailto:a.b-c_d@a.b_
+
+xmpp:foo@bar.baz
+
+xmpp:foo@bar.baz.
+-- gfm633.html --
+<p><a href="mailto:foo@bar.baz">mailto:foo@bar.baz</a></p>
+<p><a href="mailto:a.b-c_d@a.b">mailto:a.b-c_d@a.b</a></p>
+<p><a href="mailto:a.b-c_d@a.b">mailto:a.b-c_d@a.b</a>.</p>
+<p><a href="mailto:a.b-c_d@a.b">mailto:a.b-c_d@a.b</a>/</p>
+<p>mailto:a.b-c_d@a.b-</p>
+<p>mailto:a.b-c_d@a.b_</p>
+<p><a href="xmpp:foo@bar.baz">xmpp:foo@bar.baz</a></p>
+<p><a href="xmpp:foo@bar.baz">xmpp:foo@bar.baz</a>.</p>
+-- gfm634.md --
+xmpp:foo@bar.baz/txt
+
+xmpp:foo@bar.baz/txt@bin
+
+xmpp:foo@bar.baz/txt@bin.com
+-- gfm634.html --
+<p><a href="xmpp:foo@bar.baz/txt">xmpp:foo@bar.baz/txt</a></p>
+<p><a href="xmpp:foo@bar.baz/txt@bin">xmpp:foo@bar.baz/txt@bin</a></p>
+<p><a href="xmpp:foo@bar.baz/txt@bin.com">xmpp:foo@bar.baz/txt@bin.com</a></p>
+-- gfm635.md --
+xmpp:foo@bar.baz/txt/bin
+-- gfm635.html --
+<p><a href="xmpp:foo@bar.baz/txt">xmpp:foo@bar.baz/txt</a>/bin</p>
+-- 1.md --
+xhttp://go.dev y z
+αhttp://go.dev y z
+-- 1.html --
+<p>xhttp://go.dev y z
+α<a href="http://go.dev">http://go.dev</a> y z</p>
+-- 1a.md --
+xhttps://go.dev y z
+αhttps://go.dev y z
+-- 1a.html --
+<p>xhttps://go.dev y z
+α<a href="https://go.dev">https://go.dev</a> y z</p>
+-- 2.md --
+cannot follow ascii letter
+xhttp://go.dev y z
+x0http://go.dev
+αhttp://go.dev
+-- 2.html --
+<p>cannot follow ascii letter
+xhttp://go.dev y z
+x0<a href="http://go.dev">http://go.dev</a>
+α<a href="http://go.dev">http://go.dev</a></p>
+-- 3.md --
+deviations - github would include the suffixes in the URLs
+www.go.dev@def.ghi is my email
+www.go.dev!wtf
+-- 3.html --
+<p>deviations - github would include the suffixes in the URLs
+<a href="http://www.go.dev">www.go.dev</a>@def.ghi is my email
+<a href="http://www.go.dev">www.go.dev</a>!wtf</p>
+-- 4.md --
+trimming
+www.google.com/search?q=Markup+(business)))
+-- 4.html --
+<p>trimming
+<a href="http://www.google.com/search?q=Markup+(business)">www.google.com/search?q=Markup+(business)</a>))</p>
+-- 5.md --
+www.google.com/search?q=Markup+(business))).
+-- 5.html --
+<p><a href="http://www.google.com/search?q=Markup+(business)">www.google.com/search?q=Markup+(business)</a>)).</p>
+-- 6.md --
+www.google.com/search?q=Markup+(business).
+-- 6.html --
+<p><a href="http://www.google.com/search?q=Markup+(business)">www.google.com/search?q=Markup+(business)</a>.</p>
+-- 7.md --
+www.google.com/search?q=Markup+)()((business)
+-- 7.html --
+<p><a href="http://www.google.com/search?q=Markup+)()((business)">www.google.com/search?q=Markup+)()((business)</a></p>
+-- 8.md --
+www.google.com/search?q=commonmark&hl;
+-- 8.html --
+<p><a href="http://www.google.com/search?q=commonmark">www.google.com/search?q=commonmark</a>&amp;hl;</p>
+-- 9.md --
+www.google.com/search?q=commonmark&hl;)
+-- 9.html --
+<p><a href="http://www.google.com/search?q=commonmark">www.google.com/search?q=commonmark</a>&amp;hl;)</p>
+-- 10.md --
+www.google.com/search?q=(commonmark&hl;)
+-- 10.html --
+<p><a href="http://www.google.com/search?q=(commonmark&amp;hl;)">www.google.com/search?q=(commonmark&amp;hl;)</a></p>
+-- 11.md --
+www.google.com/search?q=commonmark)&hl;
+-- 11.html --
+<p><a href="http://www.google.com/search?q=commonmark">www.google.com/search?q=commonmark</a>)&amp;hl;</p>
+-- 12.md --
+www.google.com/search?q=commonmark).&hl;
+-- 12.html --
+<p><a href="http://www.google.com/search?q=commonmark">www.google.com/search?q=commonmark</a>).&amp;hl;</p>
+-- 13.md --
+www.google.com/search?q=commonmark).&hl
+-- 13.html --
+<p><a href="http://www.google.com/search?q=commonmark).&amp;hl">www.google.com/search?q=commonmark).&amp;hl</a></p>
+-- 14.md --
+www.google.com/search?q=commonmark).&hl
+-- 14.html --
+<p><a href="http://www.google.com/search?q=commonmark).&amp;hl">www.google.com/search?q=commonmark).&amp;hl</a></p>
+-- 15.md --
+www.goo-gle.com/search
+-- 15.html --
+<p><a href="http://www.goo-gle.com/search">www.goo-gle.com/search</a></p>
+-- 16.md --
+www.goo_gle.com/search
+-- 16.html --
+<p>www.goo_gle.com/search</p>
+-- 17.md --
+www.foo_bar.google.com/search
+-- 17.html --
+<p><a href="http://www.foo_bar.google.com/search">www.foo_bar.google.com/search</a></p>
+-- 18.md --
+www./search
+-- 18.html --
+<p><a href="http://www./search">www./search</a></p>
+-- 19.md --
+www.google.com.foo_bar/search
+-- 19.html --
+<p>www.google.com.foo_bar/search</p>
+-- 20.md --
+www.search
+-- 20.html --
+<p><a href="http://www.search">www.search</a></p>
+-- 21.md --
+www.
+-- 21.html --
+<p><a href="http://www">www</a>.</p>
+-- 21a.md --
+www.!search
+-- 21a.html --
+<p><a href="http://www.">www.</a>!search</p>
+-- 22.md --
+www.sea_rch
+-- 22.html --
+<p>www.sea_rch</p>
+-- 23.md --
+http://!search
+-- 23.html --
+<p>http://!search</p>
+-- 24.md --
+http://!search
+-- 24.html --
+<p>http://!search</p>
+-- 25.md --
+http://search
+-- 25.html --
+<p><a href="http://search">http://search</a></p>
+-- 26.md --
+https://search
+-- 26.html --
+<p><a href="https://search">https://search</a></p>
+-- 27.md --
+http://sea_rch
+-- 27.html --
+<p>http://sea_rch</p>
+-- 28.md --
+https://sea_rch
+-- 28.html --
+<p>https://sea_rch</p>
+-- 29.md --
+http://sea_rch.x
+-- 29.html --
+<p>http://sea_rch.x</p>
+-- 30.md --
+https://sea_rch.x
+-- 30.html --
+<p>https://sea_rch.x</p>
+-- 31.md --
+http://sea_rch.x.y
+-- 31.html --
+<p><a href="http://sea_rch.x.y">http://sea_rch.x.y</a></p>
+-- 32.md --
+http://sea_rch.x.y.http://www.google.com
+-- 32.html --
+<p><a href="http://sea_rch.x.y.http">http://sea_rch.x.y.http</a>://<a href="http://www.google.com">www.google.com</a></p>
+-- 33.md --
+http://sea_rch.http://www.google.com
+-- 33.html --
+<p>http://sea_rch.<a href="http://www.google.com">http://www.google.com</a></p>
+-- 34.md --
+_abc_@ghi.def is my email
+-- 34.html --
+<p><em>abc</em>@ghi.def is my email</p>
+-- 35.md --
+_abc@ghi_.def is my email
+-- 35.html --
+<p><em>abc@ghi</em>.def is my email</p>
+-- 36.md --
+`hello`abc@def.ghi is my email
+-- 36.html --
+<p><code>hello</code><a href="mailto:abc@def.ghi">abc@def.ghi</a> is my email</p>
+-- 37.md --
+`hello` abc@def.ghi is my email
+-- 37.html --
+<p><code>hello</code> <a href="mailto:abc@def.ghi">abc@def.ghi</a> is my email</p>
+-- 38.md --
+*hello*abc@def.ghi is my email
+-- 38.html --
+<p><em>hello</em><a href="mailto:abc@def.ghi">abc@def.ghi</a> is my email</p>
+-- 39.md --
+[link](link)abc@def.ghi is my email
+-- 39.html --
+<p><a href="link">link</a><a href="mailto:abc@def.ghi">abc@def.ghi</a> is my email</p>
+-- 40.md --
+\!abc@def.ghi is my email
+-- 40.html --
+<p>!<a href="mailto:abc@def.ghi">abc@def.ghi</a> is my email</p>
+-- 41.md --
+$abc@def.ghi is my email
+-- 41.html --
+<p>$<a href="mailto:abc@def.ghi">abc@def.ghi</a> is my email</p>
+-- 42.md --
+www.go.dev@def.ghi is my email
+-- 42.html --
+<p><a href="http://www.go.dev">www.go.dev</a>@def.ghi is my email</p>
+-- 43.md --
+abc@www.go.dev is my email
+-- 43.html --
+<p><a href="mailto:abc@www.go.dev">abc@www.go.dev</a> is my email</p>
+-- 44.md --
+αabc@def.ghi
+-- 44.html --
+<p>α<a href="mailto:abc@def.ghi">abc@def.ghi</a></p>

@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"golang.org/x/text/cases"
 )
@@ -460,4 +461,370 @@ func (x *Image) PrintText(buf *bytes.Buffer) {
 	for _, c := range x.Inner {
 		c.PrintText(buf)
 	}
+}
+
+// GitHub Flavored Markdown autolinks extension
+// https://github.github.com/gfm/#autolinks-extension-
+
+// autoLinkMore rewrites any extended autolinks in the body
+// and returns the result.
+//
+// body is a list of Plain, Emph, Strong, and Del nodes.
+// Two Plains only appear consecutively when one is a
+// potential emphasis marker that ended up being plain after all, like "_" or "**".
+// There are no Link nodes.
+//
+// The GitHub “spec” declares that “autolinks can only come at the
+// beginning of a line, after whitespace, or any of the delimiting
+// characters *, _, ~, and (”. However, the GitHub web site does not
+// enforce this rule: text like "$abc@def.ghi is my email" links the
+// text following the $ as an email address. It appears the actual rule
+// is that autolinks cannot come after ASCII letters, although they can
+// come after numbers or Unicode letters.
+// Since the only point of implementing GitHub Flavored Markdown
+// is to match GitHub's behavior, we do what they do, not what they say,
+// at least for now.
+func (p *parseState) autoLinkText(list []Inline) []Inline {
+	if !p.AutoLinkText {
+		return list
+	}
+
+	var out []Inline // allocated lazily when we first change list
+	for i, x := range list {
+		switch x := x.(type) {
+		case *Plain:
+			if rewrite := p.autoLinkPlain(x.Text); rewrite != nil {
+				if out == nil {
+					out = append(out, list[:i]...)
+				}
+				out = append(out, rewrite...)
+				continue
+			}
+		case *Strong:
+			x.Inner = p.autoLinkText(x.Inner)
+		case *Del:
+			x.Inner = p.autoLinkText(x.Inner)
+		case *Emph:
+			x.Inner = p.autoLinkText(x.Inner)
+		}
+		if out != nil {
+			out = append(out, x)
+		}
+	}
+	if out == nil {
+		return list
+	}
+	return out
+}
+
+func (p *parseState) autoLinkPlain(s string) []Inline {
+	vd := &validDomainChecker{s: s}
+	var out []Inline
+Restart:
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == '@' {
+			if before, link, after, ok := p.parseAutoEmail(s, i); ok {
+				if before != "" {
+					out = append(out, &Plain{Text: before})
+				}
+				out = append(out, link)
+				vd.skip(len(s) - len(after))
+				s = after
+				goto Restart
+			}
+		}
+
+		if (c == 'h' || c == 'm' || c == 'x' || c == 'w') && (i == 0 || !isLetter(s[i-1])) {
+			if link, after, ok := p.parseAutoProto(s, i, vd); ok {
+				if i > 0 {
+					out = append(out, &Plain{Text: s[:i]})
+				}
+				out = append(out, link)
+				vd.skip(len(s) - len(after))
+				s = after
+				goto Restart
+			}
+		}
+	}
+	if out == nil {
+		return nil
+	}
+	out = append(out, &Plain{Text: s})
+	return out
+}
+
+func (p *parseState) parseAutoProto(s string, i int, vd *validDomainChecker) (link *Link, after string, found bool) {
+	if s == "" {
+		return
+	}
+	switch s[i] {
+	case 'h':
+		var n int
+		if strings.HasPrefix(s[i:], "https://") {
+			n = len("https://")
+		} else if strings.HasPrefix(s[i:], "http://") {
+			n = len("http://")
+		} else {
+			return
+		}
+		return p.parseAutoHTTP(s[i:i+n], s, i, i+n, i+n+1, vd)
+	case 'w':
+		if !strings.HasPrefix(s[i:], "www.") {
+			return
+		}
+		// GitHub Flavored Markdown says to use http://,
+		// but it's not 1985 anymore. We live in the https:// future
+		// (unless the parser is explicitly configured otherwise).
+		// People who really care in their docs can write http:// themselves.
+		scheme := "https://"
+		if p.AutoLinkAssumeHTTP {
+			scheme = "http://"
+		}
+		return p.parseAutoHTTP(scheme, s, i, i, i+3, vd)
+	case 'm':
+		if !strings.HasPrefix(s[i:], "mailto:") {
+			return
+		}
+		return p.parseAutoMailto(s, i)
+	case 'x':
+		if !strings.HasPrefix(s[i:], "xmpp:") {
+			return
+		}
+		return p.parseAutoXmpp(s, i)
+	}
+	return
+}
+
+// parseAutoWWW parses an extended www autolink.
+// https://github.github.com/gfm/#extended-www-autolink
+func (p *parseState) parseAutoHTTP(scheme, s string, textstart, start, min int, vd *validDomainChecker) (link *Link, after string, found bool) {
+	n, ok := vd.parseValidDomain(start)
+	if !ok {
+		return
+	}
+	i := start + n
+	domEnd := i
+
+	// “After a valid domain, zero or more non-space non-< characters may follow.”
+	paren := 0
+	for i < len(s) {
+		r, n := utf8.DecodeRuneInString(s[i:])
+		if isUnicodeSpace(r) || r == '<' {
+			break
+		}
+		if r == '(' {
+			paren++
+		}
+		if r == ')' {
+			paren--
+		}
+		i += n
+	}
+
+	// https://github.github.com/gfm/#extended-autolink-path-validation
+Trim:
+	for i > min {
+		switch s[i-1] {
+		case '?', '!', '.', ',', ':', '@', '_', '~':
+			// Trim certain trailing punctuation.
+			i--
+			continue Trim
+
+		case ')':
+			// Trim trailing unmatched (by count only) parens.
+			if paren < 0 {
+				for s[i-1] == ')' && paren < 0 {
+					paren++
+					i--
+				}
+				continue Trim
+			}
+
+		case ';':
+			// Trim entity reference.
+			// After doing the work of the scan, we either cut that part off the string
+			// or we stop the trimming entirely, so there's no chance of repeating
+			// the scan on a future iteration and going accidentally quadratic.
+			// Even though the Markdown spec already requires having a complete
+			// list of all the HTML entities, the GitHub definition here just requires
+			// "looks like" an entity, meaning its an ampersand, letters/digits, and semicolon.
+			for j := i - 2; j > start; j-- {
+				if j < i-2 && s[j] == '&' {
+					i = j
+					continue Trim
+				}
+				if !isLetterDigit(s[j]) {
+					break Trim
+				}
+			}
+		}
+		break Trim
+	}
+
+	// According to the literal text of the GitHub Flavored Markdown spec
+	// and the actual behavior on GitHub,
+	// www.example.com$foo turns into <a href="https://www.example.com$foo">,
+	// but that makes the character restrictions in the valid-domain check
+	// almost meaningless. So we insist that when all is said and done,
+	// if the domain is followed by anything, that thing must be a slash,
+	// even though GitHub is not that picky.
+	// People might complain about www.example.com:1234 not working,
+	// but if you want to get fancy with that kind of thing, just write http:// in front.
+	if i > domEnd && s[domEnd] != '/' {
+		i = domEnd
+	}
+
+	if i < min {
+		return
+	}
+
+	link = &Link{
+		Inner: []Inline{&Plain{Text: s[textstart:i]}},
+		URL:   scheme + s[start:i],
+	}
+	return link, s[i:], true
+}
+
+type validDomainChecker struct {
+	s   string
+	cut int // before this index, no valid domains
+}
+
+func (v *validDomainChecker) skip(i int) {
+	v.s = v.s[i:]
+	v.cut -= i
+}
+
+// parseValidDomain parses a valid domain.
+// https://github.github.com/gfm/#valid-domain
+//
+// If s starts with a valid domain, parseValidDomain returns
+// the length of that domain and true. If s does not start with
+// a valid domain, parseValidDomain returns n, false,
+// where n is the length of a prefix guaranteed not to be acceptable
+// to any future call to parseValidDomain.
+//
+// “A valid domain consists of segments of alphanumeric characters,
+// underscores (_) and hyphens (-) separated by periods (.).
+// There must be at least one period, and no underscores may be
+// present in the last two segments of the domain.”
+//
+// The spec does not spell out whether segments can be empty.
+// Empirically, in GitHub's implementation they can.
+func (v *validDomainChecker) parseValidDomain(start int) (n int, found bool) {
+	if start < v.cut {
+		return 0, false
+	}
+	i := start
+	dots := 0
+	for ; i < len(v.s); i++ {
+		c := v.s[i]
+		if c == '_' {
+			dots = -2
+			continue
+		}
+		if c == '.' {
+			dots++
+			continue
+		}
+		if !isLDH(c) {
+			break
+		}
+	}
+	if dots >= 0 && i > start {
+		return i - start, true
+	}
+	v.cut = i
+	return 0, false
+}
+
+func (p *parseState) parseAutoEmail(s string, i int) (before string, link *Link, after string, ok bool) {
+	if s[i] != '@' {
+		return
+	}
+
+	// “One ore more characters which are alphanumeric, or ., -, _, or +.”
+	j := i
+	for j > 0 && (isLDH(s[j-1]) || s[j-1] == '_' || s[j-1] == '+' || s[j-1] == '.') {
+		j--
+	}
+	if i-j < 1 {
+		return
+	}
+
+	// “One or more characters which are alphanumeric, or - or _, separated by periods (.).
+	// There must be at least one period. The last character must not be one of - or _.”
+	dots := 0
+	k := i + 1
+	for k < len(s) && (isLDH(s[k]) || s[k] == '_' || s[k] == '.') {
+		if s[k] == '.' {
+			if s[k-1] == '.' {
+				// Empirically, .. stops the scan but foo@.bar is fine.
+				break
+			}
+			dots++
+		}
+		k++
+	}
+
+	// “., -, and _ can occur on both sides of the @, but only . may occur at the end
+	// of the email address, in which case it will not be considered part of the address”
+	if s[k-1] == '.' {
+		dots--
+		k--
+	}
+	if s[k-1] == '-' || s[k-1] == '_' {
+		return
+	}
+	if k-(i+1)-dots < 2 || dots < 1 {
+		return
+	}
+
+	link = &Link{
+		Inner: []Inline{&Plain{Text: s[j:k]}},
+		URL:   "mailto:" + s[j:k],
+	}
+	return s[:j], link, s[k:], true
+}
+
+func (p *parseState) parseAutoMailto(s string, i int) (link *Link, after string, ok bool) {
+	j := i + len("mailto:")
+	for j < len(s) && (isLDH(s[j]) || s[j] == '_' || s[j] == '+' || s[j] == '.') {
+		j++
+	}
+	if j >= len(s) || s[j] != '@' {
+		return
+	}
+	before, link, after, ok := p.parseAutoEmail(s[i:], j-i)
+	if before != "mailto:" || !ok {
+		return nil, "", false
+	}
+	link.Inner[0] = &Plain{Text: s[i : len(s)-len(after)]}
+	return link, after, true
+}
+
+func (p *parseState) parseAutoXmpp(s string, i int) (link *Link, after string, ok bool) {
+	j := i + len("xmpp:")
+	for j < len(s) && (isLDH(s[j]) || s[j] == '_' || s[j] == '+' || s[j] == '.') {
+		j++
+	}
+	if j >= len(s) || s[j] != '@' {
+		return
+	}
+	before, link, after, ok := p.parseAutoEmail(s[i:], j-i)
+	if before != "xmpp:" || !ok {
+		return nil, "", false
+	}
+	if after != "" && after[0] == '/' {
+		k := 1
+		for k < len(after) && (isLetterDigit(after[k]) || after[k] == '@' || after[k] == '.') {
+			k++
+		}
+		after = after[k:]
+	}
+	url := s[i : len(s)-len(after)]
+	link.Inner[0] = &Plain{Text: url}
+	link.URL = url
+	return link, after, true
 }

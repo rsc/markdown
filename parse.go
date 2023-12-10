@@ -168,6 +168,10 @@ type Parser struct {
 	// When a list item begins with the plain text [ ] or [x]
 	// that turns into an unchecked or checked check box.
 	TaskListItems bool
+
+	// TODO
+	AutoLinkText       bool
+	AutoLinkAssumeHTTP bool
 }
 
 type parseState struct {

@@ -311,10 +311,13 @@ func (p *parseState) inline(s string) []Inline {
 	}
 	p.emit(len(s))
 	p.list = p.emph(p.list[:0], p.list)
+	p.list = p.mergePlain(p.list)
+	p.list = p.autoLinkText(p.list)
+
 	return p.list
 }
 
-func (p *parseState) emph(dst, src []Inline) []Inline {
+func (ps *parseState) emph(dst, src []Inline) []Inline {
 	var stack [2][]*emphPlain
 	stackOf := func(c byte) int {
 		if c == '*' {
@@ -721,4 +724,37 @@ func linkCorner(url string) bool {
 		}
 	}
 	return false
+}
+
+func (p *parseState) mergePlain(list []Inline) []Inline {
+	out := list[:0]
+	start := 0
+	for i := 0; ; i++ {
+		if i < len(list) {
+			if _, ok := list[i].(*Plain); ok {
+				continue
+			}
+		}
+		// Non-Plain or end of list.
+		if start < i {
+			out = append(out, mergePlain1(list[start:i]))
+		}
+		if i >= len(list) {
+			break
+		}
+		out = append(out, list[i])
+		start = i + 1
+	}
+	return out
+}
+
+func mergePlain1(list []Inline) *Plain {
+	if len(list) == 1 {
+		return list[0].(*Plain)
+	}
+	var all []string
+	for _, pl := range list {
+		all = append(all, pl.(*Plain).Text)
+	}
+	return &Plain{Text: strings.Join(all, "")}
 }

@@ -115,6 +115,9 @@ func goldmarkParser(p *Parser) goldmark.Markdown {
 	if p.TaskListItems {
 		opts = append(opts, goldmark.WithExtensions(gext.TaskList))
 	}
+	if p.AutoLinkText {
+		opts = append(opts, goldmark.WithExtensions(gext.Linkify))
+	}
 	return goldmark.New(opts...)
 }
 
