@@ -261,7 +261,7 @@ http://sea_rch.x.y
 -- 32.md --
 http://sea_rch.x.y.http://www.google.com
 -- 32.html --
-<p><a href="http://sea_rch.x.y.http">http://sea_rch.x.y.http</a>://<a href="http://www.google.com">www.google.com</a></p>
+<p><a href="http://sea_rch.x.y.http://www.google.com">http://sea_rch.x.y.http://www.google.com</a></p>
 -- 33.md --
 http://sea_rch.http://www.google.com
 -- 33.html --
@@ -310,3 +310,7 @@ abc@www.go.dev is my email
 αabc@def.ghi
 -- 44.html --
 <p>α<a href="mailto:abc@def.ghi">abc@def.ghi</a></p>
+-- 45.md --
+https://web.site:8080/~matloob
+-- 45.html --
+<p><a href="https://web.site:8080/~matloob">https://web.site:8080/~matloob</a></p>

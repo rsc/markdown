@@ -682,7 +682,7 @@ Trim:
 	// even though GitHub is not that picky.
 	// People might complain about www.example.com:1234 not working,
 	// but if you want to get fancy with that kind of thing, just write http:// in front.
-	if i > domEnd && s[domEnd] != '/' {
+	if textstart == start && i > domEnd && s[domEnd] != '/' {
 		i = domEnd
 	}
 
