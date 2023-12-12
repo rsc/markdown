@@ -1136,3 +1136,29 @@ abc
 -- 149.html --
 <p>abc
 <pre/></p>
+-- 150.md --
+[![Line Break](https://line.break/image)](https://line.break)
+
+[![Line  Break](https://line.break/image)](https://line.break)
+
+[![Line
+Break](https://line.break/image)](https://line.break)
+
+[![Line ^J
+Break](https://line.break/image)](https://line.break)
+-- 150.html --
+<p><a href="https://line.break"><img src="https://line.break/image" alt="Line Break" /></a></p>
+<p><a href="https://line.break"><img src="https://line.break/image" alt="Line  Break" /></a></p>
+<p><a href="https://line.break"><img src="https://line.break/image" alt="Line Break" /></a></p>
+<p><a href="https://line.break"><img src="https://line.break/image" alt="Line Break" /></a></p>
+-- 151.md --
+[![**abc\
+Break**](https://line.break/image)](https://line.break)
+-- 151.html --
+<p><a href="https://line.break"><img src="https://line.break/image" alt="abc Break" /></a></p>
+-- 152.md --
+[text](link "hello
+world")
+-- 152.html --
+<p><a href="link" title="hello
+world">text</a></p>

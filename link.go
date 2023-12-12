@@ -442,8 +442,19 @@ func (*Image) Inline() {}
 func (x *Image) PrintHTML(buf *bytes.Buffer) {
 	fmt.Fprintf(buf, "<img src=\"%s\"", htmlLinkEscaper.Replace(x.URL))
 	fmt.Fprintf(buf, " alt=\"")
+	i := buf.Len()
 	for _, c := range x.Inner {
 		c.PrintText(buf)
+	}
+	// GitHub and Goldmark both rewrite \n to space
+	// but the Dingus does not.
+	// The spec says title can be split across lines but not
+	// what happens at that point.
+	out := buf.Bytes()
+	for ; i < len(out); i++ {
+		if out[i] == '\n' {
+			out[i] = ' '
+		}
 	}
 	fmt.Fprintf(buf, "\"")
 	if x.Title != "" {

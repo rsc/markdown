@@ -62,7 +62,9 @@ func (x *HardBreak) printMarkdown(buf *bytes.Buffer) {
 	buf.WriteString("\\\n")
 }
 
-func (x *HardBreak) PrintText(buf *bytes.Buffer) {}
+func (x *HardBreak) PrintText(buf *bytes.Buffer) {
+	buf.WriteString("\n")
+}
 
 type SoftBreak struct{}
 
@@ -76,7 +78,9 @@ func (x *SoftBreak) printMarkdown(buf *bytes.Buffer) {
 	buf.WriteString("\n")
 }
 
-func (x *SoftBreak) PrintText(buf *bytes.Buffer) {}
+func (x *SoftBreak) PrintText(buf *bytes.Buffer) {
+	buf.WriteString("\n")
+}
 
 func parseBreak(_ *parseState, s string, i int) (Inline, int, int, bool) {
 	start := i
