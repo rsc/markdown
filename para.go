@@ -37,14 +37,19 @@ func (b *Paragraph) printMarkdown(buf *bytes.Buffer, s mdState) {
 }
 
 type paraBuilder struct {
-	text []string
+	text  []string
+	table *tableBuilder
 }
 
-func (c *paraBuilder) extend(p *parseState, s line) (line, bool) {
+func (b *paraBuilder) extend(p *parseState, s line) (line, bool) {
 	return s, false
 }
 
 func (b *paraBuilder) build(p buildState) Block {
+	if b.table != nil {
+		return b.table.build(p)
+	}
+
 	s := strings.Join(b.text, "\n")
 	for s != "" {
 		end, ok := parseLinkRefDef(p, s)
@@ -58,15 +63,44 @@ func (b *paraBuilder) build(p buildState) Block {
 		return &Empty{p.pos()}
 	}
 
+	// Recompute EndLine because a line of b.text
+	// might have been taken away to start a table.
+	pos := p.pos()
+	pos.EndLine = pos.StartLine+len(b.text)-1
 	return &Paragraph{
-		p.pos(),
-		p.newText(p.pos(), s),
+		pos,
+		p.newText(pos, s),
 	}
 }
 
 func newPara(p *parseState, s line) (line, bool) {
 	// Process paragraph continuation text or start new paragraph.
 	b := p.para()
+	indented := p.lineDepth == len(p.stack)-2 // fully indented, not playing "pargraph continuation text" games
+	text := s.trimSpaceString()
+
+	if b != nil && b.table != nil {
+		if indented && text != "" {
+			// Continue table.
+			b.table.addRow(text)
+			return line{}, true
+		}
+		// Blank or unindented line ends table.
+		// (So does a new block structure, but the caller has checked that already.)
+		b = nil
+	}
+
+	// If we are looking for tables and this is a table start, start a table.
+	if p.Table && b != nil && indented && len(b.text) > 0 && isTableStart(b.text[len(b.text)-1], text) {
+		hdr := b.text[len(b.text)-1]
+		b.text = b.text[:len(b.text)-1]
+		tb := new(paraBuilder)
+		p.addBlock(tb)
+		tb.table = new(tableBuilder)
+		tb.table.start(hdr, text)
+		return line{}, true
+	}
+
 	if b != nil {
 		for i := p.lineDepth; i < len(p.stack); i++ {
 			p.stack[i].pos.EndLine = p.lineno
@@ -76,6 +110,6 @@ func newPara(p *parseState, s line) (line, bool) {
 		b = new(paraBuilder)
 		p.addBlock(b)
 	}
-	b.text = append(b.text, s.trimSpaceString())
+	b.text = append(b.text, text)
 	return line{}, true
 }

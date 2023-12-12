@@ -172,6 +172,9 @@ type Parser struct {
 	// TODO
 	AutoLinkText       bool
 	AutoLinkAssumeHTTP bool
+
+	// TODO
+	Table bool
 }
 
 type parseState struct {
@@ -559,12 +562,12 @@ func printb(buf *bytes.Buffer, b Block, prefix string) {
 		if !tf.IsExported() {
 			continue
 		}
-		if tf.Type != blocksType && !tf.Type.Implements(blockType) {
-			if tf.Type == inlinesType {
-				printis(buf, v.Field(i).Interface().([]Inline))
-			} else {
-				fmt.Fprintf(buf, " %s:%v", tf.Name, v.Field(i))
-			}
+		if tf.Type == inlinesType {
+			printis(buf, v.Field(i).Interface().([]Inline))
+		} else if tf.Type.Kind() == reflect.Slice && tf.Type.Elem().Kind() == reflect.String {
+			fmt.Fprintf(buf, " %s:%q", tf.Name, v.Field(i))
+		} else if tf.Type != blocksType && !tf.Type.Implements(blockType) && tf.Type.Kind() != reflect.Slice {
+			fmt.Fprintf(buf, " %s:%v", tf.Name, v.Field(i))
 		}
 	}
 
@@ -583,9 +586,26 @@ func printb(buf *bytes.Buffer, b Block, prefix string) {
 				fmt.Fprintf(buf, "\n%s", prefix)
 				printb(buf, vf.Index(i).Interface().(Block), prefix)
 			}
+		} else if tf.Type.Kind() == reflect.Slice && tf.Type != inlinesType && tf.Type.Elem().Kind() != reflect.String {
+			fmt.Fprintf(buf, "\n%s%s:", prefix, t.Field(i).Name)
+			printslice(buf, v.Field(i), prefix)
 		}
 	}
 	fmt.Fprintf(buf, ")")
+}
+
+func printslice(buf *bytes.Buffer, v reflect.Value, prefix string) {
+	if v.Type().Elem().Kind() == reflect.Slice {
+		for i := 0; i < v.Len(); i++ {
+			fmt.Fprintf(buf, "\n%s#%d:", prefix, i)
+			printslice(buf, v.Index(i), prefix+"\t")
+		}
+		return
+	}
+	for i := 0; i < v.Len(); i++ {
+		fmt.Fprintf(buf, " ")
+		printb(buf, v.Index(i).Interface().(Block), prefix+"\t")
+	}
 }
 
 func printi(buf *bytes.Buffer, in Inline) {

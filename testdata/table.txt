@@ -1,0 +1,189 @@
+-- parser.json --
+{"Table": true}
+-- gfm198.md --
+| foo | bar |
+| --- | --- |
+| baz | bim |
+-- gfm198.html --
+<table>
+<thead>
+<tr>
+<th>foo</th>
+<th>bar</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>baz</td>
+<td>bim</td>
+</tr>
+</tbody>
+</table>
+-- gfm199.md --
+| abc | defghi |
+:-: | -----------:
+bar | baz
+-- gfm199.html --
+<table>
+<thead>
+<tr>
+<th align="center">abc</th>
+<th align="right">defghi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center">bar</td>
+<td align="right">baz</td>
+</tr>
+</tbody>
+</table>
+-- gfm200.md --
+| f\|oo  |
+| ------ |
+| b `\|` az |
+| b **\|** im |
+-- gfm200.html --
+<table>
+<thead>
+<tr>
+<th>f|oo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>b <code>|</code> az</td>
+</tr>
+<tr>
+<td>b <strong>|</strong> im</td>
+</tr>
+</tbody>
+</table>
+-- gfm201.md --
+| abc | def |
+| --- | --- |
+| bar | baz |
+> bar
+-- gfm201.html --
+<table>
+<thead>
+<tr>
+<th>abc</th>
+<th>def</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>bar</td>
+<td>baz</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>bar</p>
+</blockquote>
+-- gfm202.md --
+| abc | def |
+| --- | --- |
+| bar | baz |
+bar
+
+bar
+-- gfm202.html --
+<table>
+<thead>
+<tr>
+<th>abc</th>
+<th>def</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>bar</td>
+<td>baz</td>
+</tr>
+<tr>
+<td>bar</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>bar</p>
+-- gfm203.md --
+| abc | def |
+| --- |
+| bar |
+-- gfm203.html --
+<p>| abc | def |
+| --- |
+| bar |</p>
+-- gfm204.md --
+| abc | def |
+| --- | --- |
+| bar |
+| bar | baz | boo |
+-- gfm204.html --
+<table>
+<thead>
+<tr>
+<th>abc</th>
+<th>def</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>bar</td>
+<td></td>
+</tr>
+<tr>
+<td>bar</td>
+<td>baz</td>
+</tr>
+</tbody>
+</table>
+-- gfm205.md --
+| abc | def |
+| --- | --- |
+-- gfm205.html --
+<table>
+<thead>
+<tr>
+<th>abc</th>
+<th>def</th>
+</tr>
+</thead>
+</table>
+-- 1.md --
+hello world
+this is a test
+
+> a
+b
+> |-
+> d
+e
+> e
+c
+-- 1.html --
+<p>hello world
+this is a test</p>
+<blockquote>
+<p>a</p>
+<table>
+<thead>
+<tr>
+<th>b</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>d</td>
+</tr>
+</tbody>
+</table>
+</blockquote>
+<p>e</p>
+<blockquote>
+<p>e
+c</p>
+</blockquote>

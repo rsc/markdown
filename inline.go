@@ -516,6 +516,7 @@ func parseAutoLinkOrHTML(p *parseState, s string, i int) (Inline, int, int, bool
 	}
 	return nil, 0, 0, false
 }
+
 func isLetter(c byte) bool {
 	return 'A' <= c && c <= 'Z' || 'a' <= c && c <= 'z'
 }
