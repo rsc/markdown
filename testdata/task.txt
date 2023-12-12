@@ -52,3 +52,13 @@ Others by hand, guessing based on GitHub behavior.
 <li>[y] bar</li>
 <li>[z] baz</li>
 </ul>
+-- X.md --
+- [x] foo
+- [X] bar
+- [ ] baz
+-- X.html --
+<ul>
+<li><input checked="" disabled="" type="checkbox"> foo</li>
+<li><input checked="" disabled="" type="checkbox"> bar</li>
+<li><input disabled="" type="checkbox"> baz</li>
+</ul>

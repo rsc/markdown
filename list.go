@@ -298,14 +298,15 @@ func (p *parseState) taskList(list *List) {
 			continue
 		}
 		s := pl.Text
-		if len(s) < 4 || s[0] != '[' || s[2] != ']' || (s[1] != ' ' && s[1] != 'x') {
+		if len(s) < 4 || s[0] != '[' || s[2] != ']' || (s[1] != ' ' && s[1] != 'x' && s[1] != 'X') {
 			continue
 		}
 		if s[3] != ' ' && s[3] != '\t' {
 			p.corner = true // goldmark does not require the space
 			continue
 		}
-		text.Inline = append([]Inline{&Task{Checked: s[1] == 'x'}, &Plain{Text: s[len("[x]"):]}}, text.Inline[1:]...)
+		text.Inline = append([]Inline{&Task{Checked: s[1] == 'x' || s[1] == 'X'},
+			&Plain{Text: s[len("[x]"):]}}, text.Inline[1:]...)
 	}
 }
 
