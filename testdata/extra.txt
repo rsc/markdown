@@ -1162,3 +1162,22 @@ world")
 -- 152.html --
 <p><a href="link" title="hello
 world">text</a></p>
+-- 153.md --
+<p align="center">
+
+<h1>Text</h1>
+body
+</p>
+-- 153.html --
+<p align="center">
+<h1>Text</h1>
+body
+</p>
+-- 154.md --
+<h1>Text*body*</h1>
+body
+</p>
+-- 154.html --
+<h1>Text*body*</h1>
+body
+</p>

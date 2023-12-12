@@ -109,7 +109,7 @@ func (p *parseState) startHTML(s *line) bool {
 		if 'A' <= c && c <= 'Z' {
 			c += 'a' - 'A'
 		}
-		if c < 'a' || 'z' < c {
+		if !('a' <= c && c <= 'z') && !('0' <= c && c <= '9') {
 			break
 		}
 		buf = append(buf, c)
