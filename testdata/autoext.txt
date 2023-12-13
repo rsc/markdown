@@ -314,3 +314,15 @@ abc@www.go.dev is my email
 https://web.site:8080/~matloob
 -- 45.html --
 <p><a href="https://web.site:8080/~matloob">https://web.site:8080/~matloob</a></p>
+-- parser.json --
+{"AutoLinkText": true, "AutoLinkAssumeHTTP": true, "Strikethrough": true}
+-- 46.md --
+https://web.site:8080/~matloob
+-- 46.html --
+<p><a href="https://web.site:8080/~matloob">https://web.site:8080/~matloob</a></p>
+-- parser.json --
+{"AutoLinkText": true, "AutoLinkAssumeHTTP": true}
+-- 47.md --
+https://web.site:8080/*matlo_ob
+-- 47.html --
+<p><a href="https://web.site:8080/*matlo_ob">https://web.site:8080/*matlo_ob</a></p>

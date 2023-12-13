@@ -735,10 +735,8 @@ func (p *parseState) mergePlain(list []Inline) []Inline {
 	out := list[:0]
 	start := 0
 	for i := 0; ; i++ {
-		if i < len(list) {
-			if _, ok := list[i].(*Plain); ok {
-				continue
-			}
+		if i < len(list) && toPlain(list[i]) != nil {
+			continue
 		}
 		// Non-Plain or end of list.
 		if start < i {
@@ -753,13 +751,26 @@ func (p *parseState) mergePlain(list []Inline) []Inline {
 	return out
 }
 
+func toPlain(x Inline) *Plain {
+	// TODO what about Escaped?
+	switch x := x.(type) {
+	case *Plain:
+		return x
+	case *emphPlain:
+		return &x.Plain
+	case *openPlain:
+		return &x.Plain
+	}
+	return nil
+}
+
 func mergePlain1(list []Inline) *Plain {
 	if len(list) == 1 {
-		return list[0].(*Plain)
+		return toPlain(list[0])
 	}
 	var all []string
 	for _, pl := range list {
-		all = append(all, pl.(*Plain).Text)
+		all = append(all, toPlain(pl).Text)
 	}
 	return &Plain{Text: strings.Join(all, "")}
 }
