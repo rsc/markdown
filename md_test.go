@@ -118,6 +118,9 @@ func goldmarkParser(p *Parser) goldmark.Markdown {
 	if p.AutoLinkText {
 		opts = append(opts, goldmark.WithExtensions(gext.Linkify))
 	}
+	if p.Table {
+		opts = append(opts, goldmark.WithExtensions(gext.Table))
+	}
 	return goldmark.New(opts...)
 }
 

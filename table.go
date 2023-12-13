@@ -76,15 +76,13 @@ func isTableStart(hdr, delim string) bool {
 func tableCount(row string) int {
 	row = tableTrimOuter(row)
 	col := 1
+	prev := byte(0)
 	for i := 0; i < len(row); i++ {
 		c := row[i]
-		if c == '\\' {
-			i++
-			continue
-		}
-		if c == '|' {
+		if c == '|' && prev != '\\' {
 			col++
 		}
+		prev = c
 	}
 	return col
 }
@@ -177,12 +175,9 @@ func (b *tableBuilder) parseRow(p buildState, row string, line int, width int) [
 	unesc := nop
 	for i := 0; i < len(row); i++ {
 		c := row[i]
-		if c == '\\' {
+		if c == '\\' && i+1 < len(row) && row[i+1] == '|' {
+			unesc = tableUnescape
 			i++
-			if i < len(row) && row[i] == '|' {
-				// Need to rewrite escaped pipe to pipe in cell.
-				unesc = tableUnescape
-			}
 			continue
 		}
 		if c == '|' {
