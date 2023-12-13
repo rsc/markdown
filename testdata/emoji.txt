@@ -1,0 +1,20 @@
+-- parser.json --
+{"Emoji": true}
+-- 1.md --
+emojis
+:+1:
+:100:
+:1st_place_medal:
+:negative_squared_cross_mark:
+:wales:
+:south_georgia_south_sandwich_islands:
+end
+-- 1.html --
+<p>emojis
+👍
+💯
+🥇
+❎
+🏴󠁧󠁢󠁷󠁬󠁳󠁿
+🇬🇸
+end</p>

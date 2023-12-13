@@ -175,6 +175,9 @@ type Parser struct {
 
 	// TODO
 	Table bool
+
+	// TODO
+	Emoji bool
 }
 
 type parseState struct {

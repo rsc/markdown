@@ -269,6 +269,10 @@ func (p *parseState) inline(s string) []Inline {
 			parser = parseBreak
 		case '&':
 			parser = parseHTMLEntity
+		case ':':
+			if p.Emoji {
+				parser = parseEmoji
+			}
 		}
 		if parser != nil {
 			if x, start, end, ok := parser(p, s, i); ok {
@@ -758,4 +762,39 @@ func mergePlain1(list []Inline) *Plain {
 		all = append(all, pl.(*Plain).Text)
 	}
 	return &Plain{Text: strings.Join(all, "")}
+}
+
+func parseEmoji(p *parseState, s string, i int) (Inline, int, int, bool) {
+	for j := i + 1; ; j++ {
+		if j >= len(s) || j-i > 2+maxEmojiLen {
+			break
+		}
+		if s[j] == ':' {
+			name := s[i+1 : j]
+			if utf, ok := emoji[name]; ok {
+				return &Emoji{s[i : j+1], utf}, i, j + 1, true
+			}
+			break
+		}
+	}
+	return nil, 0, 0, false
+}
+
+type Emoji struct {
+	Name string // emoji :name:, including colons
+	Text string // Unicode for emoji sequence
+}
+
+func (*Emoji) Inline() {}
+
+func (x *Emoji) PrintHTML(buf *bytes.Buffer) {
+	htmlEscaper.WriteString(buf, x.Text)
+}
+
+func (x *Emoji) printMarkdown(buf *bytes.Buffer) {
+	buf.WriteString(x.Text)
+}
+
+func (x *Emoji) PrintText(buf *bytes.Buffer) {
+	htmlEscaper.WriteString(buf, x.Text)
 }
