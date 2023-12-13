@@ -198,3 +198,30 @@ c</p>
 </tr>
 </thead>
 </table>
+-- 3.md --
+|          | Foo      | Bar      |
+| -------- | -------- | -------- |
+| a        | value1   | value2   |
+| b        | value3   | value4   |
+-- 3.html --
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Foo</th>
+<th>Bar</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>a</td>
+<td>value1</td>
+<td>value2</td>
+</tr>
+<tr>
+<td>b</td>
+<td>value3</td>
+<td>value4</td>
+</tr>
+</tbody>
+</table>

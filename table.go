@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+type tableTrimmed string
+
 func isTableSpace(c byte) bool {
 	return c == ' ' || c == '\t' || c == '\v' || c == '\f'
 }
@@ -25,7 +27,7 @@ func tableTrimSpace(s string) string {
 	return s[i:j]
 }
 
-func tableTrimOuter(row string) string {
+func tableTrimOuter(row string) tableTrimmed {
 	row = tableTrimSpace(row)
 	if len(row) > 0 && row[0] == '|' {
 		row = row[1:]
@@ -33,15 +35,15 @@ func tableTrimOuter(row string) string {
 	if len(row) > 0 && row[len(row)-1] == '|' {
 		row = row[:len(row)-1]
 	}
-	return row
+	return tableTrimmed(row)
 }
 
-func isTableStart(hdr, delim string) bool {
+func isTableStart(hdr1, delim1 string) bool {
 	// Scan potential delimiter string, counting columns.
 	// This happens on every line of text,
 	// so make it relatively quick - nothing expensive.
 	col := 0
-	delim = tableTrimOuter(delim)
+	delim := tableTrimOuter(delim1)
 	i := 0
 	for ; ; col++ {
 		for i < len(delim) && isTableSpace(delim[i]) {
@@ -70,11 +72,10 @@ func isTableStart(hdr, delim string) bool {
 			i++
 		}
 	}
-	return col == tableCount(hdr)
+	return col == tableCount(tableTrimOuter(hdr1))
 }
 
-func tableCount(row string) int {
-	row = tableTrimOuter(row)
+func tableCount(row tableTrimmed) int {
 	col := 1
 	prev := byte(0)
 	for i := 0; i < len(row); i++ {
@@ -88,9 +89,9 @@ func tableCount(row string) int {
 }
 
 type tableBuilder struct {
-	hdr   string
-	delim string
-	rows  []string
+	hdr   tableTrimmed
+	delim tableTrimmed
+	rows  []tableTrimmed
 }
 
 func (b *tableBuilder) start(hdr, delim string) {
@@ -168,7 +169,7 @@ func (b *tableBuilder) build(p buildState) Block {
 	return t
 }
 
-func (b *tableBuilder) parseRow(p buildState, row string, line int, width int) []*Text {
+func (b *tableBuilder) parseRow(p buildState, row tableTrimmed, line int, width int) []*Text {
 	out := make([]*Text, 0, width)
 	pos := Position{StartLine: line, EndLine: line}
 	start := 0
@@ -181,7 +182,7 @@ func (b *tableBuilder) parseRow(p buildState, row string, line int, width int) [
 			continue
 		}
 		if c == '|' {
-			out = append(out, p.newText(pos, unesc(strings.Trim(row[start:i], " \t\v\f"))))
+			out = append(out, p.newText(pos, unesc(strings.Trim(string(row[start:i]), " \t\v\f"))))
 			if len(out) == width {
 				// Extra cells are discarded!
 				return out
@@ -190,7 +191,7 @@ func (b *tableBuilder) parseRow(p buildState, row string, line int, width int) [
 			unesc = nop
 		}
 	}
-	out = append(out, p.newText(pos, unesc(strings.Trim(row[start:], " \t\v\f"))))
+	out = append(out, p.newText(pos, unesc(strings.Trim(string(row[start:]), " \t\v\f"))))
 	for len(out) < width {
 		// Missing cells are considered empty.
 		out = append(out, p.newText(pos, ""))
@@ -215,16 +216,16 @@ func tableUnescape(text string) string {
 	return string(out)
 }
 
-func (b *tableBuilder) parseAlign(delim string, n int) []string {
+func (b *tableBuilder) parseAlign(delim tableTrimmed, n int) []string {
 	align := make([]string, 0, tableCount(delim))
 	start := 0
 	for i := 0; i < len(delim); i++ {
 		if delim[i] == '|' {
-			align = append(align, tableAlign(delim[start:i]))
+			align = append(align, tableAlign(string(delim[start:i])))
 			start = i + 1
 		}
 	}
-	align = append(align, tableAlign(delim[start:]))
+	align = append(align, tableAlign(string(delim[start:])))
 	return align
 }
 

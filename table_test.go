@@ -14,6 +14,9 @@ var tableCountTests = []struct {
 	{"|x|", 1},
 	{"||", 1},
 	{"| |", 1},
+	{"| | |", 2},
+	{"| | Foo | Bar |", 3},
+	{"|          | Foo      | Bar      |", 3},
 	{"", 1},
 	{"|a|b", 2},
 	{"|a| ", 1},
@@ -29,7 +32,7 @@ var tableCountTests = []struct {
 
 func TestTableCount(t *testing.T) {
 	for _, tt := range tableCountTests {
-		n := tableCount(tt.row)
+		n := tableCount(tableTrimOuter(tt.row))
 		if n != tt.n {
 			t.Errorf("tableCount(%#q) = %d, want %d", tt.row, n, tt.n)
 		}
