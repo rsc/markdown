@@ -49,9 +49,9 @@ func newATXHeading(p *parseState, s line) (line, bool) {
 	var n int
 	if peek.trimHeading(&n) {
 		s := peek.string()
-		s = strings.TrimRight(s, " \t")
+		s = trimRightSpaceTab(s)
 		// Remove trailing '#'s.
-		if t := strings.TrimRight(s, "#"); t != strings.TrimRight(t, " \t") || t == "" {
+		if t := strings.TrimRight(s, "#"); t != trimRightSpaceTab(t) || t == "" {
 			s = t
 		}
 		var id string
@@ -92,7 +92,7 @@ func extractID(p *parseState, s string) (id, s2 string) {
 		return "", s
 	}
 	j := i + strings.IndexByte(s[i:], '}')
-	if j < 0 || strings.TrimRight(s[j+1:], " \t") != "" {
+	if j < 0 || trimRightSpaceTab(s[j+1:]) != "" {
 		return "", s
 	}
 	id = strings.TrimSpace(s[i+2 : j])

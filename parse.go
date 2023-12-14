@@ -180,8 +180,8 @@ type Parser struct {
 	Emoji bool
 
 	// TODO
-	SmartDot bool
-	SmartDash bool
+	SmartDot   bool
+	SmartDash  bool
 	SmartQuote bool
 }
 
@@ -204,6 +204,8 @@ type parseState struct {
 	// for fixup at end
 	lists []*List
 	texts []*Text
+
+	backticks backtickParser
 }
 
 func (p *parseState) newText(pos Position, text string) *Text {
@@ -491,8 +493,63 @@ func (s *line) string() string {
 	panic("bad spaces")
 }
 
+func trimLeftSpaceTab(s string) string {
+	i := 0
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+		i++
+	}
+	return s[i:]
+}
+
+func trimRightSpaceTab(s string) string {
+	j := len(s)
+	for j > 0 && (s[j-1] == ' ' || s[j-1] == '\t') {
+		j--
+	}
+	return s[:j]
+}
+
+func trimSpaceTab(s string) string {
+	i := 0
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+		i++
+	}
+	s = s[i:]
+	j := len(s)
+	for j > 0 && (s[j-1] == ' ' || s[j-1] == '\t') {
+		j--
+	}
+	return s[:j]
+}
+
+func trimSpace(s string) string {
+	i := 0
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+		i++
+	}
+	s = s[i:]
+	j := len(s)
+	for j > 0 && (s[j-1] == ' ' || s[j-1] == '\t') {
+		j--
+	}
+	return s[:j]
+}
+
+func trimSpaceTabNewline(s string) string {
+	i := 0
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n') {
+		i++
+	}
+	s = s[i:]
+	j := len(s)
+	for j > 0 && (s[j-1] == ' ' || s[j-1] == '\t' || s[j-1] == '\n') {
+		j--
+	}
+	return s[:j]
+}
+
 func (s *line) isBlank() bool {
-	return strings.Trim(s.text[s.i:], " \t") == ""
+	return trimLeftSpaceTab(s.text[s.i:]) == ""
 }
 
 func (s *line) eof() bool {
@@ -500,11 +557,11 @@ func (s *line) eof() bool {
 }
 
 func (s *line) trimSpaceString() string {
-	return strings.TrimLeft(s.text[s.i:], " \t")
+	return trimLeftSpaceTab(s.text[s.i:])
 }
 
 func (s *line) trimString() string {
-	return strings.Trim(s.text[s.i:], " \t")
+	return trimSpaceTab(s.text[s.i:])
 }
 
 func ToHTML(b Block) string {
@@ -541,7 +598,7 @@ func printMarkdownBlocks(bs []Block, buf *bytes.Buffer, s mdState) {
 		// Preserve blank lines between blocks.
 		if prevEnd > 0 {
 			for i := prevEnd + 1; i < b.Pos().StartLine; i++ {
-				buf.WriteString(strings.TrimRight(s.prefix, " \t"))
+				buf.WriteString(trimRightSpaceTab(s.prefix))
 				buf.WriteByte('\n')
 			}
 		}

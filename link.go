@@ -135,7 +135,7 @@ func parseLinkLabel(p *parseState, s string, i int) (string, int, bool) {
 				p.corner = true
 				break
 			}
-			if label := strings.Trim(s[i+1:j], " \t\n"); label != "" {
+			if label := trimSpaceTabNewline(s[i+1 : j]); label != "" {
 				// Note: CommonMark Dingus does not escape.
 				return label, j + 1, true
 			}
@@ -152,10 +152,18 @@ func parseLinkLabel(p *parseState, s string, i int) (string, int, bool) {
 }
 
 func normalizeLabel(s string) string {
+	if strings.Contains(s, "[") || strings.Contains(s, "]") {
+		// Labels cannot have [ ] so avoid the work of translating.
+		// This is especially important for pathlogical cases like
+		// [[[[[[[[[[a]]]]]]]]]] which would otherwise generate quadratic
+		// amounts of garbage.
+		return ""
+	}
+
 	// “To normalize a label, strip off the opening and closing brackets,
 	// perform the Unicode case fold, strip leading and trailing spaces, tabs, and line endings,
 	// and collapse consecutive internal spaces, tabs, and line endings to a single space.”
-	s = strings.Trim(s, " \t\n")
+	s = trimSpaceTabNewline(s)
 	var b strings.Builder
 	space := false
 	hi := false
@@ -200,7 +208,7 @@ func parseLinkDest(s string, i int) (string, int, bool) {
 			}
 			if s[j] == '>' {
 				// TODO unescape?
-				return mdUnescaper.Replace(s[i+1 : j]), j + 1, true
+				return mdUnescape(s[i+1 : j]), j + 1, true
 			}
 			if s[j] == '\\' {
 				j++
@@ -219,6 +227,11 @@ Loop:
 		switch s[j] {
 		case '(':
 			depth++
+			if depth > 32 {
+				// Avoid quadratic inputs by stopping if too deep.
+				// This is the same depth that cmark-gfm uses.
+				return "", 0, false
+			}
 		case ')':
 			if depth == 0 {
 				break Loop
@@ -240,7 +253,7 @@ Loop:
 	// TODO: Validate dest?
 	// TODO: Unescape?
 	// NOTE: CommonMark Dingus does not reject control characters.
-	return mdUnescaper.Replace(dest), j, true
+	return mdUnescape(dest), j, true
 }
 
 func parseAutoLinkURI(s string, i int) (Inline, int, bool) {

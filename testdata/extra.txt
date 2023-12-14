@@ -1181,3 +1181,7 @@ body
 <h1>Text*body*</h1>
 body
 </p>
+-- 155.md --
+[a](li(nk "title")
+-- 155.html --
+<p><a href="li(nk" title="title">a</a></p>

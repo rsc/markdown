@@ -39,7 +39,7 @@ func (b *CodeBlock) PrintHTML(buf *bytes.Buffer) {
 	}
 	buf.WriteString(">")
 	if b.Fence == "" { // TODO move
-		for len(b.Text) > 0 && strings.Trim(b.Text[len(b.Text)-1], " \t") == "" {
+		for len(b.Text) > 0 && trimSpaceTab(b.Text[len(b.Text)-1]) == "" {
 			b.Text = b.Text[:len(b.Text)-1]
 		}
 	}
@@ -157,7 +157,7 @@ func (s *line) trimFence(fence, info *string, n *int) bool {
 		if c == '`' && strings.Contains(txt, "`") {
 			return false
 		}
-		txt = strings.Trim(txt, " \t")
+		txt = trimSpaceTab(txt)
 		*info = txt
 
 		*fence = f[:n]

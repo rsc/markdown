@@ -235,7 +235,7 @@ func (p *parseState) skip(i int) {
 }
 
 func (p *parseState) inline(s string) []Inline {
-	s = strings.Trim(s, " \t")
+	s = trimSpaceTab(s)
 	// Scan text looking for inlines.
 	// Leaf inlines are converted immediately.
 	// Non-leaf inlines have potential starts pushed on a stack while we await completion.
@@ -245,6 +245,7 @@ func (p *parseState) inline(s string) []Inline {
 	p.emitted = 0
 	var opens []int // indexes of open ![ and [ Plains in p.list
 	var lastLinkOpen int
+	backticks := false
 	i := 0
 	for i < len(s) {
 		var parser func(*parseState, string, int) (Inline, int, int, bool)
@@ -252,7 +253,11 @@ func (p *parseState) inline(s string) []Inline {
 		case '\\':
 			parser = parseEscape
 		case '`':
-			parser = parseCodeSpan
+			if !backticks {
+				backticks = true
+				p.backticks.reset()
+			}
+			parser = p.backticks.parseCodeSpan
 		case '<':
 			parser = parseAutoLinkOrHTML
 		case '[':
@@ -444,6 +449,13 @@ Src:
 	return dst
 }
 
+func mdUnescape(s string) string {
+	if !strings.Contains(s, `\`) && !strings.Contains(s, `&`) {
+		return s
+	}
+	return mdUnescaper.Replace(s)
+}
+
 var mdUnescaper = func() *strings.Replacer {
 	var list = []string{
 		`\!`, `!`,
@@ -544,13 +556,34 @@ func parseDash(p *parseState, s string, i int) (Inline, int, int, bool) {
 	return &Plain{strings.Repeat("—", em) + strings.Repeat("–", en)}, i, i + n, true
 }
 
-func parseCodeSpan(_ *parseState, s string, i int) (Inline, int, int, bool) {
+// Inline code span markers must fit on punched cards, to match cmark-gfm.
+const maxBackticks = 80
+
+type backtickParser struct {
+	last    [maxBackticks]int
+	scanned bool
+}
+
+func (b *backtickParser) reset() {
+	*b = backtickParser{}
+}
+
+func (b *backtickParser) parseCodeSpan(p *parseState, s string, i int) (Inline, int, int, bool) {
 	start := i
 	// Count leading backticks. Need to find that many again.
 	n := 1
 	for i+n < len(s) && s[i+n] == '`' {
 		n++
 	}
+
+	// If we've already scanned the whole string (for a different count),
+	// we can skip a failed scan by checking whether we saw this count.
+	// To enable this optimization, following cmark-gfm, we declare by fiat
+	// that more than maxBackticks backquotes is too many.
+	if n > len(b.last) || b.scanned && b.last[n-1] < i+n {
+		goto NoMatch
+	}
+
 	for end := i + n; end < len(s); {
 		if s[end] != '`' {
 			end++
@@ -560,7 +593,11 @@ func parseCodeSpan(_ *parseState, s string, i int) (Inline, int, int, bool) {
 		for end < len(s) && s[end] == '`' {
 			end++
 		}
-		if end-estart == n {
+		m := end - estart
+		if !b.scanned && m < len(b.last) {
+			b.last[m-1] = estart
+		}
+		if m == n {
 			// Match.
 			// Line endings are converted to single spaces.
 			text := s[i+n : estart]
@@ -568,14 +605,16 @@ func parseCodeSpan(_ *parseState, s string, i int) (Inline, int, int, bool) {
 
 			// If enclosed text starts and ends with a space and is not all spaces,
 			// one space is removed from start and end, to allow `` ` `` to quote a single backquote.
-			if len(text) >= 2 && text[0] == ' ' && text[len(text)-1] == ' ' && strings.Trim(text, " ") != "" {
+			if len(text) >= 2 && text[0] == ' ' && text[len(text)-1] == ' ' && trimSpace(text) != "" {
 				text = text[1 : len(text)-1]
 			}
 
 			return &Code{text, n}, start, end, true
 		}
 	}
+	b.scanned = true
 
+NoMatch:
 	// No match, so none of these backticks count: skip them all.
 	// For example ``x` is not a single backtick followed by a code span.
 	// Returning nil, 0, false would advance to the second backtick and try again.
