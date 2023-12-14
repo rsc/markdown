@@ -36,3 +36,27 @@ This will ~~~not~~~ strike.
 -- 2.html --
 <p><del>Hi</del> Hello, <del>there</del> world!
 5<del>6</del>78</p>
+-- 3.md --
+~~___`this`___~~
+-- 3.html --
+<p><del><em><strong><code>this</code></strong></em></del></p>
+-- 4.md --
+~~***`this`***~~
+-- 4.html --
+<p><del><em><strong><code>this</code></strong></em></del></p>
+-- 5.md --
+~~*this*~~
+-- 5.html --
+<p><del><em>this</em></del></p>
+-- 6.md --
+~~_this_~~
+-- 6.html --
+<p><del><em>this</em></del></p>
+-- 7.md --
+~~___this___~~
+-- 7.html --
+<p><del><em><strong>this</strong></em></del></p>
+-- 8.md --
+~~__this__~~
+-- 8.html --
+<p><del><strong>this</strong></del></p>

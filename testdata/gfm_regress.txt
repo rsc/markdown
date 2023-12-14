@@ -1,0 +1,181 @@
+// go run cmark2txtar.go /users/rsc/pub/cmark-gfm/test/regression.txt
+-- 1.md --
+line1
+
+line2
+-- 1.html --
+<p>line1</p>
+<p>line2</p>
+-- 2.md --
+By taking it apart
+
+- alternative solutions
+	^J
+Repeatedly solving
+	^J
+- how techniques
+-- 2.html --
+<p>By taking it apart</p>
+<ul>
+<li>alternative solutions</li>
+</ul>
+<p>Repeatedly solving</p>
+<ul>
+<li>how techniques</li>
+</ul>
+-- 3.md --
+<h1>lorem</h1>
+
+<h2>lorem</h2>
+
+<h3>lorem</h3>
+
+<h4>lorem</h4>
+
+<h5>lorem</h5>
+
+<h6>lorem</h6>
+-- 3.html --
+<h1>lorem</h1>
+<h2>lorem</h2>
+<h3>lorem</h3>
+<h4>lorem</h4>
+<h5>lorem</h5>
+<h6>lorem</h6>
+-- 4.md --
+hi
+--	^J
+-- 4.html --
+<h2>hi</h2>
+-- 5.md --
+a***b* c*
+-- 5.html --
+<p>a*<em><em>b</em> c</em></p>
+-- 6.md --
+[a]
+
+[a]: <te<st>
+-- 6.html --
+<p>[a]</p>
+<p>[a]: &lt;te<st></p>
+-- 7.md --
+[a](te\ st)
+-- 7.html --
+<p>[a](te\ st)</p>
+-- parser.json --
+{"Strikethrough": true}
+-- 8.md --
+~~**_`this`_**~~  ^J
+~~***`this`***~~  ^J
+~~___`this`___~~
+
+**_`this`_**  ^J
+***`this`***  ^J
+___`this`___
+
+~~**_this_**~~  ^J
+~~***this***~~  ^J
+~~___this___~~
+
+**_this_**  ^J
+***this***  ^J
+___this___
+-- 8.html --
+<p><del><strong><em><code>this</code></em></strong></del><br />
+<del><em><strong><code>this</code></strong></em></del><br />
+<del><em><strong><code>this</code></strong></em></del></p>
+<p><strong><em><code>this</code></em></strong><br />
+<em><strong><code>this</code></strong></em><br />
+<em><strong><code>this</code></strong></em></p>
+<p><del><strong><em>this</em></strong></del><br />
+<del><em><strong>this</strong></em></del><br />
+<del><em><strong>this</strong></em></del></p>
+<p><strong><em>this</em></strong><br />
+<em><strong>this</strong></em><br />
+<em><strong>this</strong></em></p>
+-- parser.json --
+{}
+-- 9.md --
+City:
+<span itemprop="contentLocation" itemscope itemtype="https://schema.org/City">
+  <meta itemprop="name" content="Springfield">
+</span>
+-- 9.html --
+<p>City:
+<span itemprop="contentLocation" itemscope itemtype="https://schema.org/City">
+<meta itemprop="name" content="Springfield">
+</span></p>
+-- parser.json --
+{"Strikethrough": true}
+-- 10.md --
+~Hi~ Hello, world!
+-- 10.html --
+<p><del>Hi</del> Hello, world!</p>
+-- parser.json --
+{}
+-- parser.json --
+{"Strikethrough": true}
+-- 11.md --
+This ~text~ ~~is~~ ~~~curious~~~.
+-- 11.html --
+<p>This <del>text</del> <del>is</del> ~~~curious~~~.</p>
+-- parser.json --
+{}
+-- 12.md --
+[x](http://members.aon.at/~nkehrer/ibm_5110/emu5110.html)
+-- 12.html --
+<p><a href="http://members.aon.at/~nkehrer/ibm_5110/emu5110.html">x</a></p>
+-- 13.md --
+City:
+<span itemprop="contentLocation" itemscope itemtype="https://schema.org/City">
+  <meta itemprop="name" content="Springfield">
+</span>
+-- 13.html --
+<p>City:
+<span itemprop="contentLocation" itemscope itemtype="https://schema.org/City">
+<meta itemprop="name" content="Springfield">
+</span></p>
+-- 14.md --
+[a](\ b)
+
+[a](<<b)
+
+[a](<b
+)
+-- 14.html --
+<p>[a](\ b)</p>
+<p>[a](&lt;&lt;b)</p>
+<p>[a](&lt;b
+)</p>
+-- 15.md --
+[link](url ((title))
+-- 15.html --
+<p>[link](url ((title))</p>
+-- 16.md --
+</script>
+
+</pre>
+
+</style>
+-- 16.html --
+</script>
+</pre>
+</style>
+-- 17.md --
+[a](<b) c>
+-- 17.html --
+<p>[a](&lt;b) c&gt;</p>
+-- parser.json --
+{"Table": true}
+-- 18.md --
+|
+-|
+-- 18.html --
+<p>|
+-|</p>
+-- parser.json --
+{}
+-- 19.md --
+*text* [link](#section)
+-- 19.html --
+<p><em>text</em> <a href="#section">link</a></p>

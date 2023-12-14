@@ -322,8 +322,11 @@ func (p *parseState) inline(s string) []Inline {
 }
 
 func (ps *parseState) emph(dst, src []Inline) []Inline {
-	var stack [2][]*emphPlain
+	var stack [3][]*emphPlain
 	stackOf := func(c byte) int {
+		if c == '~' {
+			return 2
+		}
 		if c == '*' {
 			return 1
 		}
@@ -358,7 +361,10 @@ func (ps *parseState) emph(dst, src []Inline) []Inline {
 				// Looking for same symbol and compatible with p.Text.
 				for i := len(*stk) - 1; i >= 0; i-- {
 					start := (*stk)[i]
-					if (p.canOpen && p.canClose || start.canOpen && start.canClose) && (p.n+start.n)%3 == 0 && (p.n%3 != 0 || start.n%3 != 0) {
+					if p.Text[0] != '~' && (p.canOpen && p.canClose || start.canOpen && start.canClose) && (p.n+start.n)%3 == 0 && (p.n%3 != 0 || start.n%3 != 0) {
+						continue
+					}
+					if p.Text[0] == '~' && len(p.Text) != len(start.Text) { // ~ matches ~, ~~ matches ~~
 						continue
 					}
 					var d int

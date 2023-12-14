@@ -66,7 +66,7 @@ func (b *paraBuilder) build(p buildState) Block {
 	// Recompute EndLine because a line of b.text
 	// might have been taken away to start a table.
 	pos := p.pos()
-	pos.EndLine = pos.StartLine+len(b.text)-1
+	pos.EndLine = pos.StartLine + len(b.text) - 1
 	return &Paragraph{
 		pos,
 		p.newText(pos, s),
@@ -80,13 +80,18 @@ func newPara(p *parseState, s line) (line, bool) {
 	text := s.trimSpaceString()
 
 	if b != nil && b.table != nil {
-		if indented && text != "" {
+		if indented && text != "" && text != "|" {
 			// Continue table.
 			b.table.addRow(text)
 			return line{}, true
 		}
 		// Blank or unindented line ends table.
 		// (So does a new block structure, but the caller has checked that already.)
+		// So does a line with just a pipe:
+		// https://github.com/github/cmark-gfm/pull/127 and
+		// https://github.com/github/cmark-gfm/pull/128
+		// fixed a buffer overread by rejecting | by itself as a table line.
+		// That seems to violate the spec, but we will play along.
 		b = nil
 	}
 

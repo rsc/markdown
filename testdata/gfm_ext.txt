@@ -1,0 +1,443 @@
+// go run cmark2txtar.go /users/rsc/pub/cmark-gfm/test/extensions.txt
+-- parser.json --
+{"Strikethrough": true, "Table": true}
+-- 1.md --
+| abc | def |
+| --- | --- |
+| ghi | jkl |
+| mno | pqr |
+-- 1.html --
+<table>
+<thead>
+<tr>
+<th>abc</th>
+<th>def</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ghi</td>
+<td>jkl</td>
+</tr>
+<tr>
+<td>mno</td>
+<td>pqr</td>
+</tr>
+</tbody>
+</table>
+-- 2.md --
+Hello!
+
+| _abc_ | セン |
+| ----- | ---- |
+| 1. Block elements inside cells don't work. | |
+| But _**inline elements do**_. | x |
+
+Hi!
+-- 2.html --
+<p>Hello!</p>
+<table>
+<thead>
+<tr>
+<th><em>abc</em></th>
+<th>セン</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Block elements inside cells don't work.</td>
+<td></td>
+</tr>
+<tr>
+<td>But <em><strong>inline elements do</strong></em>.</td>
+<td>x</td>
+</tr>
+</tbody>
+</table>
+<p>Hi!</p>
+-- 3.md --
+| Not enough table | to be considered table |
+
+| Not enough table | to be considered table |
+| Not enough table | to be considered table |
+
+| Just enough table | to be considered table |
+| ----------------- | ---------------------- |
+
+| ---- | --- |
+
+|x|
+|-|
+
+| xyz |
+| --- |
+-- 3.html --
+<p>| Not enough table | to be considered table |</p>
+<p>| Not enough table | to be considered table |
+| Not enough table | to be considered table |</p>
+<table>
+<thead>
+<tr>
+<th>Just enough table</th>
+<th>to be considered table</th>
+</tr>
+</thead>
+</table>
+<p>| ---- | --- |</p>
+<table>
+<thead>
+<tr>
+<th>x</th>
+</tr>
+</thead>
+</table>
+<table>
+<thead>
+<tr>
+<th>xyz</th>
+</tr>
+</thead>
+</table>
+-- 4.md --
+abc | def
+--- | ---
+xyz | ghi
+-- 4.html --
+<table>
+<thead>
+<tr>
+<th>abc</th>
+<th>def</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>xyz</td>
+<td>ghi</td>
+</tr>
+</tbody>
+</table>
+-- 5.md --
+Hello!
+
+| _abc_ | セン |
+| ----- | ---- |
+| this row has a space at the end | | ^J
+| But _**inline elements do**_. | x |
+
+Hi!
+-- 5.html --
+<p>Hello!</p>
+<table>
+<thead>
+<tr>
+<th><em>abc</em></th>
+<th>セン</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>this row has a space at the end</td>
+<td></td>
+</tr>
+<tr>
+<td>But <em><strong>inline elements do</strong></em>.</td>
+<td>x</td>
+</tr>
+</tbody>
+</table>
+<p>Hi!</p>
+-- 6.md --
+aaa | bbb | ccc | ddd | eee
+:-- | --- | :-: | --- | --:
+fff | ggg | hhh | iii | jjj
+-- 6.html --
+<table>
+<thead>
+<tr>
+<th align="left">aaa</th>
+<th>bbb</th>
+<th align="center">ccc</th>
+<th>ddd</th>
+<th align="right">eee</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left">fff</td>
+<td>ggg</td>
+<td align="center">hhh</td>
+<td>iii</td>
+<td align="right">jjj</td>
+</tr>
+</tbody>
+</table>
+-- 7.md --
+| a | b | c |
+| --- | --- |
+| this | isn't | okay |
+-- 7.html --
+<p>| a | b | c |
+| --- | --- |
+| this | isn't | okay |</p>
+-- 8.md --
+| a | b | c |
+| --- | --- | ---
+| x
+| a | b
+| 1 | 2 | 3 | 4 | 5 |
+-- 8.html --
+<table>
+<thead>
+<tr>
+<th>a</th>
+<th>b</th>
+<th>c</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>x</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>a</td>
+<td>b</td>
+<td></td>
+</tr>
+<tr>
+<td>1</td>
+<td>2</td>
+<td>3</td>
+</tr>
+</tbody>
+</table>
+-- 9.md --
+| a | b |
+| --- | --- |
+| Escaped pipes are \|okay\|. | Like \| this. |
+| Within `\|code\| is okay` too. |
+| _**`c\|`**_ \| complex
+| don't **\_reparse\_**
+-- 9.html --
+<table>
+<thead>
+<tr>
+<th>a</th>
+<th>b</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Escaped pipes are |okay|.</td>
+<td>Like | this.</td>
+</tr>
+<tr>
+<td>Within <code>|code| is okay</code> too.</td>
+<td></td>
+</tr>
+<tr>
+<td><em><strong><code>c|</code></strong></em> | complex</td>
+<td></td>
+</tr>
+<tr>
+<td>don't <strong>_reparse_</strong></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+-- 10.md --
+| a |
+--- |
+-- 10.html --
+<table>
+<thead>
+<tr>
+<th>a</th>
+</tr>
+</thead>
+</table>
+-- 11.md --
+| a | b |
+| --- | --- |
+| \\ | `\\` |
+| \\\\ | `\\\\` |
+| \_ | `\_` |
+| \| | `\|` |
+| \a | `\a` |
+
+\\ `\\`
+
+\\\\ `\\\\`
+
+\_ `\_`
+
+\| `\|`
+
+\a `\a`
+-- 11.html --
+<table>
+<thead>
+<tr>
+<th>a</th>
+<th>b</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>\</td>
+<td><code>\\</code></td>
+</tr>
+<tr>
+<td>\\</td>
+<td><code>\\\\</code></td>
+</tr>
+<tr>
+<td>_</td>
+<td><code>\_</code></td>
+</tr>
+<tr>
+<td>|</td>
+<td><code>|</code></td>
+</tr>
+<tr>
+<td>\a</td>
+<td><code>\a</code></td>
+</tr>
+</tbody>
+</table>
+<p>\ <code>\\</code></p>
+<p>\\ <code>\\\\</code></p>
+<p>_ <code>\_</code></p>
+<p>| <code>\|</code></p>
+<p>\a <code>\a</code></p>
+-- 12.md --
+| a |
+| --- |
+| <strong>hello</strong> |
+| ok <br> sure |
+-- 12.html --
+<table>
+<thead>
+<tr>
+<th>a</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>hello</strong></td>
+</tr>
+<tr>
+<td>ok <br> sure</td>
+</tr>
+</tbody>
+</table>
+-- 13.md --
+Here's a link to [Freedom Planet 2][].
+
+| Here's a link to [Freedom Planet 2][] in a table header. |
+| --- |
+| Here's a link to [Freedom Planet 2][] in a table row. |
+
+[Freedom Planet 2]: http://www.freedomplanet2.com/
+-- 13.html --
+<p>Here's a link to <a href="http://www.freedomplanet2.com/">Freedom Planet 2</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Here's a link to <a href="http://www.freedomplanet2.com/">Freedom Planet 2</a> in a table header.</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Here's a link to <a href="http://www.freedomplanet2.com/">Freedom Planet 2</a> in a table row.</td>
+</tr>
+</tbody>
+</table>
+-- 14.md --
+| a | b | c |
+| --- | --- | --- |
+| d || e |
+-- 14.html --
+<table>
+<thead>
+<tr>
+<th>a</th>
+<th>b</th>
+<th>c</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>d</td>
+<td></td>
+<td>e</td>
+</tr>
+</tbody>
+</table>
+-- 15.md --
+| a | b |
+| --- | --- |
+|***(a)***|
+-- 15.html --
+<table>
+<thead>
+<tr>
+<th>a</th>
+<th>b</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em><strong>(a)</strong></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+-- 16.md --
+123
+456
+| a | b |
+| ---| --- |
+d | e
+-- 16.html --
+<p>123
+456</p>
+<table>
+<thead>
+<tr>
+<th>a</th>
+<th>b</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>d</td>
+<td>e</td>
+</tr>
+</tbody>
+</table>
+-- 17.md --
+A proper ~strikethrough~.
+-- 17.html --
+<p>A proper <del>strikethrough</del>.</p>
+-- 18.md --
+These are ~not strikethroughs.
+
+No, they are not~
+
+This ~is ~ legit~ isn't ~ legit.
+
+This is not ~~~~~one~~~~~ huge strikethrough.
+
+~one~ ~~two~~ ~~~three~~~
+
+No ~mismatch~~
+-- 18.html --
+<p>These are ~not strikethroughs.</p>
+<p>No, they are not~</p>
+<p>This <del>is ~ legit</del> isn't ~ legit.</p>
+<p>This is not ~~~~~one~~~~~ huge strikethrough.</p>
+<p><del>one</del> <del>two</del> ~~~three~~~</p>
+<p>No ~mismatch~~</p>

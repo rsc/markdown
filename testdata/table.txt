@@ -225,3 +225,32 @@ c</p>
 </tr>
 </tbody>
 </table>
+-- 4.md --
+|
+|-
+|x
+|
+-- 4.html --
+<p>|
+|-
+|x
+|</p>
+-- 5.md --
+||
+|-
+|x
+|
+-- 5.html --
+<table>
+<thead>
+<tr>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>x</td>
+</tr>
+</tbody>
+</table>
+<p>|</p>

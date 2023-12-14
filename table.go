@@ -72,6 +72,15 @@ func isTableStart(hdr1, delim1 string) bool {
 			i++
 		}
 	}
+
+	if strings.TrimSpace(hdr1) == "|" {
+		// https://github.com/github/cmark-gfm/pull/127 and
+		// https://github.com/github/cmark-gfm/pull/128
+		// fixed a buffer overread by rejecting | by itself as a table line.
+		// That seems to violate the spec, but we will play along.
+		return false
+	}
+
 	return col == tableCount(tableTrimOuter(hdr1))
 }
 

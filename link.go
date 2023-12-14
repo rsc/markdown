@@ -226,6 +226,9 @@ Loop:
 			depth--
 		case '\\':
 			if j+1 < len(s) {
+				if s[j+1] == ' ' || s[j+1] == '\t' {
+					return "", 0, false
+				}
 				j++
 			}
 		case ' ', '\t', '\n':
