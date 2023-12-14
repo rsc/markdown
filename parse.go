@@ -178,6 +178,11 @@ type Parser struct {
 
 	// TODO
 	Emoji bool
+
+	// TODO
+	SmartDot bool
+	SmartDash bool
+	SmartQuote bool
 }
 
 type parseState struct {

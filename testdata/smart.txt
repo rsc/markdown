@@ -1,0 +1,14 @@
+-- parser.json --
+{"SmartQuote": true}
+-- 1.md --
+'hello'
+-- 1.html --
+<p>‘hello’</p>
+-- 2.md --
+my'hello'
+-- 2.html --
+<p>my’hello’</p>
+-- 3.md --
+[my]'hello'
+-- 3.html --
+<p>[my]’hello’</p>

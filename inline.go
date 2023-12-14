@@ -261,6 +261,18 @@ func (p *parseState) inline(s string) []Inline {
 			parser = parseImageOpen
 		case '_', '*':
 			parser = parseEmph
+		case '.':
+			if p.SmartDot {
+				parser = parseDot
+			}
+		case '-':
+			if p.SmartDash {
+				parser = parseDash
+			}
+		case '"', '\'':
+			if p.SmartQuote {
+				parser = parseEmph
+			}
 		case '~':
 			if p.Strikethrough {
 				parser = parseEmph
@@ -322,15 +334,10 @@ func (p *parseState) inline(s string) []Inline {
 }
 
 func (ps *parseState) emph(dst, src []Inline) []Inline {
-	var stack [3][]*emphPlain
+	const chars = "_*~\"'"
+	var stack [len(chars)][]*emphPlain
 	stackOf := func(c byte) int {
-		if c == '~' {
-			return 2
-		}
-		if c == '*' {
-			return 1
-		}
-		return 0
+		return strings.IndexByte(chars, c)
 	}
 
 	trimStack := func() {
@@ -342,6 +349,7 @@ func (ps *parseState) emph(dst, src []Inline) []Inline {
 		}
 	}
 
+Src:
 	for i := 0; i < len(src); i++ {
 		if open, ok := src[i].(*openPlain); ok {
 			// Convert unused link/image open marker to plain text.
@@ -353,7 +361,6 @@ func (ps *parseState) emph(dst, src []Inline) []Inline {
 			dst = append(dst, src[i])
 			continue
 		}
-		strike := p.Text[0] == '~'
 		if p.canClose {
 			stk := &stack[stackOf(p.Text[0])]
 		Loop:
@@ -361,11 +368,27 @@ func (ps *parseState) emph(dst, src []Inline) []Inline {
 				// Looking for same symbol and compatible with p.Text.
 				for i := len(*stk) - 1; i >= 0; i-- {
 					start := (*stk)[i]
-					if p.Text[0] != '~' && (p.canOpen && p.canClose || start.canOpen && start.canClose) && (p.n+start.n)%3 == 0 && (p.n%3 != 0 || start.n%3 != 0) {
+					if (p.Text[0] == '*' || p.Text[0] == '_') && (p.canOpen && p.canClose || start.canOpen && start.canClose) && (p.n+start.n)%3 == 0 && (p.n%3 != 0 || start.n%3 != 0) {
 						continue
 					}
 					if p.Text[0] == '~' && len(p.Text) != len(start.Text) { // ~ matches ~, ~~ matches ~~
 						continue
+					}
+					if p.Text[0] == '"' {
+						dst[start.i].(*emphPlain).Text = "“"
+						p.Text = "”"
+						dst = append(dst, p)
+						*stk = (*stk)[:i]
+						// no trimStack
+						continue Src
+					}
+					if p.Text[0] == '\'' {
+						dst[start.i].(*emphPlain).Text = "‘"
+						p.Text = "’"
+						dst = append(dst, p)
+						*stk = (*stk)[:i]
+						// no trimStack
+						continue Src
 					}
 					var d int
 					if len(p.Text) >= 2 && len(start.Text) >= 2 {
@@ -375,6 +398,7 @@ func (ps *parseState) emph(dst, src []Inline) []Inline {
 						// emph
 						d = 1
 					}
+					del := p.Text[0] == '~'
 					x := &Emph{Marker: p.Text[:d], Inner: append([]Inline(nil), dst[start.i+1:]...)}
 					start.Text = start.Text[:len(start.Text)-d]
 					p.Text = p.Text[d:]
@@ -384,7 +408,7 @@ func (ps *parseState) emph(dst, src []Inline) []Inline {
 						dst = dst[:start.i+1]
 					}
 					trimStack()
-					if strike {
+					if del {
 						dst = append(dst, (*Del)(x))
 					} else if d == 2 {
 						dst = append(dst, (*Strong)(x))
@@ -397,10 +421,20 @@ func (ps *parseState) emph(dst, src []Inline) []Inline {
 			}
 		}
 		if p.Text != "" {
+			stk := &stack[stackOf(p.Text[0])]
+			if p.Text == "'" {
+				p.Text = "’"
+			}
+			if p.Text == "\"" {
+				if p.canClose {
+					p.Text = "”"
+				} else {
+					p.Text = "“"
+				}
+			}
 			if p.canOpen {
 				p.i = len(dst)
 				dst = append(dst, p)
-				stk := &stack[stackOf(p.Text[0])]
 				*stk = append(*stk, p)
 			} else {
 				dst = append(dst, &p.Plain)
@@ -474,6 +508,40 @@ func parseEscape(p *parseState, s string, i int) (Inline, int, int, bool) {
 		}
 	}
 	return nil, 0, 0, false
+}
+
+func parseDot(p *parseState, s string, i int) (Inline, int, int, bool) {
+	if i+2 < len(s) && s[i+1] == '.' && s[i+2] == '.' {
+		return &Plain{"…"}, i, i + 3, true
+	}
+	return nil, 0, 0, false
+}
+
+func parseDash(p *parseState, s string, i int) (Inline, int, int, bool) {
+	if i+1 >= len(s) || s[i+1] != '-' {
+		return nil, 0, 0, false
+	}
+
+	n := 2
+	for i+n < len(s) && s[i+n] == '-' {
+		n++
+	}
+
+	// Mimic cmark-gfm. Can't make this stuff up.
+	em, en := 0, 0
+	switch {
+	case n%3 == 0:
+		em = n / 3
+	case n%2 == 0:
+		en = n / 2
+	case n%3 == 2:
+		em = (n - 2) / 3
+		en = 1
+	case n%3 == 1:
+		em = (n - 4) / 3
+		en = 2
+	}
+	return &Plain{strings.Repeat("—", em) + strings.Repeat("–", en)}, i, i + n, true
 }
 
 func parseCodeSpan(_ *parseState, s string, i int) (Inline, int, int, bool) {
@@ -553,8 +621,10 @@ func parseImageOpen(_ *parseState, s string, i int) (Inline, int, int, bool) {
 func parseEmph(p *parseState, s string, i int) (Inline, int, int, bool) {
 	c := s[i]
 	j := i + 1
-	for j < len(s) && s[j] == c {
-		j++
+	if c == '*' || c == '~' || c == '_' {
+		for j < len(s) && s[j] == c {
+			j++
+		}
 	}
 	if c == '~' && j-i != 2 {
 		// Goldmark does not accept ~text~
@@ -600,7 +670,11 @@ func parseEmph(p *parseState, s string, i int) (Inline, int, int, bool) {
 
 	var canOpen, canClose bool
 
-	if c == '*' || c == '~' {
+	switch c {
+	case '\'', '"':
+		canOpen = leftFlank && !rightFlank && before != ']' && before != ')'
+		canClose = rightFlank
+	case '*', '~':
 		// “A single * character can open emphasis iff
 		// it is part of a left-flanking delimiter run.”
 
@@ -614,7 +688,7 @@ func parseEmph(p *parseState, s string, i int) (Inline, int, int, bool) {
 		// “A double ** can close strong emphasis iff
 		// it is part of a right-flanking delimiter run.”
 		canClose = rightFlank
-	} else {
+	case '_':
 		// “A single _ character can open emphasis iff
 		// it is part of a left-flanking delimiter run and either
 		// (a) not part of a right-flanking delimiter run or
