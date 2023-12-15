@@ -8,6 +8,7 @@ emojis
 :negative_squared_cross_mark:
 :wales:
 :south_georgia_south_sandwich_islands:
+:woman_facepalming:
 end
 -- 1.html --
 <p>emojis
@@ -17,4 +18,5 @@ end
 ❎
 🏴󠁧󠁢󠁷󠁬󠁳󠁿
 🇬🇸
+🤦‍♀️
 end</p>

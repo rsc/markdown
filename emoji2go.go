@@ -16,6 +16,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -23,12 +24,8 @@ import (
 
 var outfile = flag.String("o", "", "write output to `file`")
 
-func main() {
-	log.SetFlags(0)
-	log.SetPrefix("emoji2go: ")
-	flag.Parse()
-
-	resp, err := http.Get("https://api.github.com/emojis")
+func get(url string) []byte {
+	resp, err := http.Get(url)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -39,9 +36,19 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	return data
+}
 
+var gemojiRE = regexp.MustCompile(`</?g-emoji[^<>]*>`)
+
+func main() {
+	log.SetFlags(0)
+	log.SetPrefix("emoji2go: ")
+	flag.Parse()
+
+	emojiJSON := get("https://api.github.com/emojis")
 	list := make(map[string]string)
-	err = json.Unmarshal(data, &list)
+	err := json.Unmarshal(emojiJSON, &list)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -52,6 +59,8 @@ func main() {
 	}
 	sort.Strings(names)
 
+	emojiHTML := string(get("https://gist.github.com/rsc/316bc98c066ad111973634d435203aac"))
+
 	bad := false
 	var buf bytes.Buffer
 	buf.WriteString(hdr)
@@ -59,31 +68,24 @@ func main() {
 	n := 0
 	for _, name := range names {
 		n = max(n, len(name))
-		url := list[name]
-		_, file, ok := strings.Cut(url, "/emoji/unicode/")
+		_, val, ok := strings.Cut(emojiHTML, "<td><code>"+name+"</code></td>\n<td>")
 		if !ok {
-			// There are a handful of non-Unicode emoji on GitHub, like
-			// :accessibility:, :basecamp:, :dependabot:, :electron:.
-			// Ignore those.
-			continue
-		}
-		file, _, ok = strings.Cut(file, ".png")
-		if !ok {
-			log.Printf("bad URL: :%s: => %s", name, url)
+			log.Printf("gist missing :%s:", name)
 			bad = true
 			continue
 		}
-		var runes []rune
-		for _, f := range strings.Split(file, "-") {
-			r, err := strconv.ParseUint(f, 16, 32)
-			if err != nil {
-				log.Printf("bad URL: :%s: => %s", name, url)
-				bad = true
-				continue
-			}
-			runes = append(runes, rune(r))
+		val, _, ok = strings.Cut(val, "</td>")
+		if !ok {
+			log.Printf("gist missing :%s:", name)
+			bad = true
+			continue
 		}
-		fmt.Fprintf(&buf, "\t%q: %s,\n", name, strconv.QuoteToASCII(string(runes)))
+		val = gemojiRE.ReplaceAllString(val, "")
+		if strings.Contains(val, "<") {
+			log.Printf("skipping %s: non-unicode: %s", name, val)
+			continue
+		}
+		fmt.Fprintf(&buf, "\t%q: %s,\n", name, strconv.QuoteToASCII(val))
 	}
 	fmt.Fprintf(&buf, "}\n\n")
 
@@ -103,7 +105,7 @@ func main() {
 			log.Fatal(err)
 		}
 	} else {
-		os.Stdout.Write(buf.Bytes())
+		os.Stdout.Write(src)
 	}
 }
 
