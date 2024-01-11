@@ -422,21 +422,25 @@ func (x *Link) printMarkdown(buf *bytes.Buffer) {
 }
 
 func (x *Link) printRemainingMarkdown(buf *bytes.Buffer) {
-	// TODO(jba): escaping
 	for _, c := range x.Inner {
 		c.printMarkdown(buf)
 	}
 	buf.WriteString("](")
 	buf.WriteString(x.URL)
-	if x.Title != "" {
-		closeChar := x.TitleChar
-		openChar := closeChar
-		if openChar == ')' {
-			openChar = '('
-		}
-		fmt.Fprintf(buf, " %c%s%c", openChar, x.Title /*TODO: escape*/, closeChar)
-	}
+	printLinkTitleMarkdown(buf, x.Title, x.TitleChar)
 	buf.WriteByte(')')
+}
+
+func printLinkTitleMarkdown(buf *bytes.Buffer, title string, titleChar byte) {
+	if title == "" {
+		return
+	}
+	closeChar := titleChar
+	openChar := closeChar
+	if openChar == ')' {
+		openChar = '('
+	}
+	fmt.Fprintf(buf, " %c%s%c", openChar, title /*TODO(jba): escape*/, closeChar)
 }
 
 func (x *Link) PrintText(buf *bytes.Buffer) {

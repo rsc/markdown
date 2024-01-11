@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 )
 
@@ -589,7 +590,18 @@ func (b *Document) PrintHTML(buf *bytes.Buffer) {
 
 func (b *Document) printMarkdown(buf *bytes.Buffer, s mdState) {
 	printMarkdownBlocks(b.Blocks, buf, s)
-	// TODO(jba): print links
+	// Print links sorted by keys for deterministic output.
+	var keys []string
+	for k := range b.Links {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	for _, k := range keys {
+		l := b.Links[k]
+		fmt.Fprintf(buf, "[%s]: %s", k, l.URL)
+		printLinkTitleMarkdown(buf, l.Title, l.TitleChar)
+		buf.WriteByte('\n')
+	}
 }
 
 func printMarkdownBlocks(bs []Block, buf *bytes.Buffer, s mdState) {
