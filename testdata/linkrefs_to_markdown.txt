@@ -1,0 +1,39 @@
+Tests for rendering a document's link references in markdown.
+-- simple --
+A document.
+
+[foo]: u
+-- want --
+A document.
+
+[foo]: u
+-- sorted --
+A document.
+
+[foo]: u1
+[bar]: u2
+-- want --
+A document.
+
+[bar]: u2
+[foo]: u1
+-- interleaved --
+First.
+
+[foo]: u1
+Second.
+
+[bar]: u2
+-- want --
+First.
+
+Second.
+
+[bar]: u2
+[foo]: u1
+-- titles --
+A document.
+
+[r1]: u1 (title1)
+[r2]: u2 "title2"
+[r3]: u3 'title3'
