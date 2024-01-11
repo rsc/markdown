@@ -40,7 +40,10 @@ func (b *Heading) printMarkdown(buf *bytes.Buffer, s mdState) {
 	s.prefix = ""
 	b.Text.printMarkdown(buf, s)
 	if b.ID != "" {
-		fmt.Fprintf(buf, " {#%s}", b.ID)
+		// A heading text is a block, so it ends in a newline. Move the newline
+		// after the ID.
+		buf.Truncate(buf.Len() - 1)
+		fmt.Fprintf(buf, " {#%s}\n", b.ID)
 	}
 }
 

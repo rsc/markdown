@@ -208,3 +208,14 @@ func TestToMarkdown(t *testing.T) {
 		})
 	}
 }
+
+func TestHeadingIDToMarkdown(t *testing.T) {
+	p := Parser{HeadingIDs: true}
+	text := `# H {#id}`
+	doc := p.Parse(text)
+	got := ToMarkdown(doc)
+	want := text + "\n"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
