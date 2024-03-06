@@ -219,3 +219,22 @@ func TestHeadingIDToMarkdown(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+// Code.ToMarkdown computed the fewer number of ticks for the content.
+func TestCodeToMarkdown(t *testing.T) {
+	for _, test := range []struct {
+		content, want string
+	}{
+		{"x", "`x`"},
+		{"`x`", "`` `x` ``"},
+		{"a ``` b``", "````a ``` b`` ````"},
+	} {
+		c := &Code{Text: test.content}
+		var buf bytes.Buffer
+		c.printMarkdown(&buf)
+		got := buf.String()
+		if got != test.want {
+			t.Errorf("%q: got %q, want %q", test.content, got, test.want)
+		}
+	}
+}
