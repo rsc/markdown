@@ -87,7 +87,7 @@ func parseLinkRefDef(p buildState, s string) (int, bool) {
 
 	label = normalizeLabel(label)
 	if p.link(label) == nil {
-		p.defineLink(label, &Link{URL: dest, Title: title, TitleChar: titleChar, corner: corner})
+		p.defineLink(label, &Link{URL: dest, Title: title, TitleChar: titleChar, corner: corner, label: label})
 	}
 	return i, true
 }
@@ -400,6 +400,7 @@ type Link struct {
 	Title     string
 	TitleChar byte // ', " or )
 	corner    bool
+	label     string
 }
 
 func (*Link) Inline() {}
@@ -425,10 +426,16 @@ func (x *Link) printRemainingMarkdown(buf *bytes.Buffer) {
 	for _, c := range x.Inner {
 		c.printMarkdown(buf)
 	}
-	buf.WriteString("](")
-	buf.WriteString(x.URL)
-	printLinkTitleMarkdown(buf, x.Title, x.TitleChar)
-	buf.WriteByte(')')
+	if x.label != "" {
+		buf.WriteString("][")
+		buf.WriteString(x.label)
+		buf.WriteByte(']')
+	} else {
+		buf.WriteString("](")
+		buf.WriteString(x.URL)
+		printLinkTitleMarkdown(buf, x.Title, x.TitleChar)
+		buf.WriteByte(')')
+	}
 }
 
 func printLinkTitleMarkdown(buf *bytes.Buffer, title string, titleChar byte) {
@@ -455,6 +462,7 @@ type Image struct {
 	Title     string
 	TitleChar byte
 	corner    bool
+	label     string
 }
 
 func (*Image) Inline() {}

@@ -7,6 +7,16 @@ A document.
 A document.
 
 [foo]: u
+-- labels --
+[First][foo]
+[Second](u2)
+
+[foo]: u1
+-- want --
+[First][foo]
+[Second](u2)
+
+[foo]: u1
 -- sorted --
 A document.
 

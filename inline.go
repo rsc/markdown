@@ -808,7 +808,7 @@ func (p *parseState) parseLinkClose(s string, i int, open *openPlain) (*Link, in
 				break
 			}
 			if link, ok := p.links[normalizeLabel(label)]; ok {
-				return &Link{URL: link.URL, Title: link.Title, corner: link.corner}, i, true
+				return &Link{URL: link.URL, Title: link.Title, corner: link.corner, label: label}, i, true
 			}
 			// Note: Could break here, but CommonMark dingus does not
 			// fall back to trying Text for [Text][Label] when Label is unknown.
