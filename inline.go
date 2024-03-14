@@ -808,7 +808,7 @@ func (p *parseState) parseLinkClose(s string, i int, open *openPlain) (*Link, in
 				break
 			}
 			if link, ok := p.links[normalizeLabel(label)]; ok {
-				return &Link{URL: link.URL, Title: link.Title, corner: link.corner, label: label}, i, true
+				return &Link{URL: link.URL, Title: link.Title, corner: link.corner, label: label, kind: fullRef}, i, true
 			}
 			// Note: Could break here, but CommonMark dingus does not
 			// fall back to trying Text for [Text][Label] when Label is unknown.
@@ -819,12 +819,16 @@ func (p *parseState) parseLinkClose(s string, i int, open *openPlain) (*Link, in
 
 	// Collapsed or shortcut reference link: [Text][] or [Text].
 	end := i + 1
+	var refLink linkKind
 	if strings.HasPrefix(s[end:], "[]") {
+		refLink = collapsedRef
 		end += 2
+	} else {
+		refLink = shortcutRef
 	}
 
 	if link, ok := p.links[normalizeLabel(s[open.i:i])]; ok {
-		return &Link{URL: link.URL, Title: link.Title, corner: link.corner}, end, true
+		return &Link{URL: link.URL, Title: link.Title, corner: link.corner, kind: refLink}, end, true
 	}
 	return nil, 0, false
 }
