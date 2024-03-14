@@ -394,12 +394,23 @@ func (x *AutoLink) PrintText(buf *bytes.Buffer) {
 	fmt.Fprintf(buf, "%s", htmlEscaper.Replace(x.Text))
 }
 
+type linkKind int
+
+const (
+	inline linkKind = iota
+	fullRef
+	collapsedRef
+	shortcutRef
+)
+
 type Link struct {
 	Inner     []Inline
 	URL       string
 	Title     string
 	TitleChar byte // ', " or )
 	corner    bool
+	label     string
+	kind      linkKind
 }
 
 func (*Link) Inline() {}
@@ -425,10 +436,21 @@ func (x *Link) printRemainingMarkdown(buf *bytes.Buffer) {
 	for _, c := range x.Inner {
 		c.printMarkdown(buf)
 	}
-	buf.WriteString("](")
-	buf.WriteString(x.URL)
-	printLinkTitleMarkdown(buf, x.Title, x.TitleChar)
-	buf.WriteByte(')')
+	switch x.kind {
+	case inline:
+		buf.WriteString("](")
+		buf.WriteString(x.URL)
+		printLinkTitleMarkdown(buf, x.Title, x.TitleChar)
+		buf.WriteByte(')')
+	case fullRef:
+		buf.WriteString("][")
+		buf.WriteString(x.label)
+		buf.WriteByte(']')
+	case collapsedRef:
+		buf.WriteString("][]")
+	case shortcutRef:
+		buf.WriteByte(']')
+	}
 }
 
 func printLinkTitleMarkdown(buf *bytes.Buffer, title string, titleChar byte) {
@@ -455,6 +477,8 @@ type Image struct {
 	Title     string
 	TitleChar byte
 	corner    bool
+	label     string
+	kind      linkKind
 }
 
 func (*Image) Inline() {}
