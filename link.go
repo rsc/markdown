@@ -87,7 +87,7 @@ func parseLinkRefDef(p buildState, s string) (int, bool) {
 
 	label = normalizeLabel(label)
 	if p.link(label) == nil {
-		p.defineLink(label, &Link{URL: dest, Title: title, TitleChar: titleChar, corner: corner, label: label})
+		p.defineLink(label, &Link{URL: dest, Title: title, TitleChar: titleChar, corner: corner})
 	}
 	return i, true
 }
