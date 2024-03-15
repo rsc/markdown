@@ -7,6 +7,7 @@ package markdown
 import (
 	"bytes"
 	"strings"
+	"unicode/utf8"
 )
 
 type tableTrimmed string
@@ -159,6 +160,102 @@ func (t *Table) PrintHTML(buf *bytes.Buffer) {
 }
 
 func (t *Table) printMarkdown(buf *bytes.Buffer, s mdState) {
+	// inline all Text values in Header and Rows to
+	// get final, rendered widths
+	var (
+		hdr       = make([]string, len(t.Header))
+		rows      = make([][]string, 0, len(t.Rows))
+		maxWidths = make([]int, len(t.Header))
+
+		xb = &bytes.Buffer{}
+		xs string
+	)
+
+	toString := func(txt *Text) string {
+		xb.Reset()
+		txt.printMarkdown(xb, s)
+		return strings.TrimSpace(xb.String())
+	}
+
+	for i, txt := range t.Header {
+		xs = toString(txt)
+		hdr[i] = xs
+		maxWidths[i] = utf8.RuneCountInString(xs)
+	}
+
+	for _, row := range t.Rows {
+		xrow := make([]string, len(hdr))
+		for j := range t.Header {
+			xs = toString(row[j])
+			xrow[j] = xs
+			if n := utf8.RuneCountInString(xs); n > maxWidths[j] {
+				maxWidths[j] = n
+			}
+		}
+		rows = append(rows, xrow)
+	}
+
+	buf.WriteString(s.prefix)
+	for i, cell := range hdr {
+		buf.WriteString("| ")
+		pad(buf, cell, t.Align[i], maxWidths[i])
+		buf.WriteString(" ")
+	}
+	buf.WriteString("|\n")
+
+	buf.WriteString(s.prefix)
+	for i, a := range t.Align {
+		w := maxWidths[i]
+		buf.WriteString("| ")
+		switch a {
+		case "left":
+			buf.WriteString(":")
+			repeat(buf, '-', w-1)
+		case "center":
+			buf.WriteString(":")
+			repeat(buf, '-', w-2)
+			buf.WriteString(":")
+		case "right":
+			repeat(buf, '-', w-1)
+			buf.WriteString(":")
+		default:
+			repeat(buf, '-', w)
+		}
+		buf.WriteString(" ")
+	}
+	buf.WriteString("|\n")
+
+	for _, row := range rows {
+		buf.WriteString(s.prefix)
+		for i := range t.Header {
+			buf.WriteString("| ")
+			pad(buf, row[i], t.Align[i], maxWidths[i])
+			buf.WriteString(" ")
+		}
+		buf.WriteString("|\n")
+	}
+}
+
+func repeat(buf *bytes.Buffer, c byte, n int) {
+	for i := 0; i < n; i++ {
+		buf.WriteByte(c)
+	}
+}
+
+func pad(buf *bytes.Buffer, cell, align string, w int) {
+	n := w - utf8.RuneCountInString(cell)
+	switch align {
+	default:
+		buf.WriteString(cell)
+		repeat(buf, ' ', n)
+	case "right":
+		repeat(buf, ' ', n)
+		buf.WriteString(cell)
+	case "center":
+		repeat(buf, ' ', n/2)
+		buf.WriteString(cell)
+		repeat(buf, ' ', n-n/2)
+	}
 }
 
 func (b *tableBuilder) build(p buildState) Block {

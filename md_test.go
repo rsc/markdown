@@ -160,6 +160,14 @@ func TestToMarkdown(t *testing.T) {
 			}
 			var p Parser
 			for i := 0; i < len(a.Files); {
+				if a.Files[i].Name == "parser.json" {
+					p = Parser{}
+					if err := json.Unmarshal(a.Files[i].Data, &p); err != nil {
+						t.Fatal(err)
+					}
+					i++
+					continue
+				}
 				// Each test case is a single markdown document that should render either as itself,
 				// or if followed by a file named "want", then by that file.
 				name := a.Files[i].Name

@@ -4,7 +4,10 @@
 
 package markdown
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+)
 
 var tableCountTests = []struct {
 	row string
@@ -35,6 +38,55 @@ func TestTableCount(t *testing.T) {
 		n := tableCount(tableTrimOuter(tt.row))
 		if n != tt.n {
 			t.Errorf("tableCount(%#q) = %d, want %d", tt.row, n, tt.n)
+		}
+	}
+}
+
+func TestPad(t *testing.T) {
+	testCases := []struct {
+		raw, align string
+		w          int
+
+		want string
+	}{
+		{"foo", "center", 8, "  foo   "},
+		{"foo", "center", 6, " foo  "},
+		{"foo", "center", 5, " foo "},
+		{"föó", "center", 5, " föó "},
+		{"foo", "center", 4, "foo "},
+		{"foo", "center", 3, "foo"},
+
+		{"foo", "left", 8, "foo     "},
+		{"foo", "right", 8, "     foo"},
+		{"foo", "", 8, "foo     "},
+
+		{"foo", "left", 6, "foo   "},
+		{"foo", "right", 6, "   foo"},
+		{"foo", "", 6, "foo   "},
+
+		{"foo", "left", 5, "foo  "},
+		{"foo", "right", 5, "  foo"},
+		{"foo", "", 5, "foo  "},
+
+		{"foo", "left", 4, "foo "},
+		{"foo", "right", 4, " foo"},
+		{"foo", "", 4, "foo "},
+
+		{"foo", "left", 3, "foo"},
+		{"foo", "right", 3, "foo"},
+		{"foo", "", 3, "foo"},
+	}
+
+	for _, tc := range testCases {
+		in := tc.raw
+		a := tc.align
+		w := tc.w
+		want := tc.want
+		var buf bytes.Buffer
+		pad(&buf, in, a, w)
+		h := buf.String()
+		if h != want {
+			t.Errorf("\npad(%s, %s, %d)\n have %q\n want %q", in, a, w, h, want)
 		}
 	}
 }
