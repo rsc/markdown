@@ -1,0 +1,38 @@
+-- parser.json --
+{"Table": true}
+-- padded --
+|foo|bar|baz|
+|--|--|--|
+|1|2|3|
+|a|b|c|
+-- want --
+| foo | bar | baz |
+| --- | --- | --- |
+| 1   | 2   | 3   |
+| a   | b   | c   |
+-- aligned --
+|foo|bar|baz|
+|:--|:-:|--:|
+|1|2|3|
+|a|b|c|
+-- want --
+| foo | bar | baz |
+| :-- | :-: | --: |
+| 1   |  2  |   3 |
+| a   |  b  |   c |
+-- with_normalized_inline --
+|[foo](u1 )|
+|---|
+|1|
+|a|
+-- want --
+| [foo](u1) |
+| --------- |
+| 1         |
+| a         |
+-- indented --
+- item 1
+
+  | col1 | col2 |
+  | ---- | ---- |
+  | 1    | 2    |
