@@ -6,6 +6,7 @@ package markdown
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 )
 
@@ -159,6 +160,91 @@ func (t *Table) PrintHTML(buf *bytes.Buffer) {
 }
 
 func (t *Table) printMarkdown(buf *bytes.Buffer, s mdState) {
+	fmt.Printf("%#v\n", s)
+	// inline all Text values in Header and Rows to
+	// get final, rendered widths
+	var (
+		hdr       = make([]string, len(t.Header))
+		rows      = make([][]string, 0, len(t.Rows))
+		maxWidths = make([]int, len(t.Header))
+
+		xb = &bytes.Buffer{}
+		xs string
+	)
+
+	toString := func(txt *Text) string {
+		xb.Reset()
+		txt.printMarkdown(xb, s)
+		return strings.TrimSpace(xb.String())
+	}
+
+	for i, txt := range t.Header {
+		xs = toString(txt)
+		hdr[i] = xs
+		maxWidths[i] = len(xs)
+	}
+
+	for _, row := range t.Rows {
+		xrow := make([]string, len(hdr))
+		for j := range t.Header {
+			xs = toString(row[j])
+			xrow[j] = xs
+			if n := len(xs); n > maxWidths[j] {
+				maxWidths[j] = n
+			}
+		}
+		rows = append(rows, xrow)
+	}
+
+	buf.WriteString(s.prefix)
+	for i, cell := range hdr {
+		fmt.Fprintf(buf, "| %s ", paddedCell(cell, t.Align[i], maxWidths[i]))
+	}
+	buf.WriteString("|\n")
+
+	buf.WriteString(s.prefix)
+	for i, a := range t.Align {
+		w := maxWidths[i]
+		var cell string
+		switch a {
+		case "left":
+			cell = ":" + strings.Repeat("-", w-1)
+		case "center":
+			cell = ":" + strings.Repeat("-", w-2) + ":"
+		case "right":
+			cell = strings.Repeat("-", w-1) + ":"
+		default:
+			cell = strings.Repeat("-", w)
+		}
+		fmt.Fprintf(buf, "| %s ", cell)
+	}
+	buf.WriteString("|\n")
+
+	for _, row := range rows {
+		buf.WriteString(s.prefix)
+		for i := range t.Header {
+			fmt.Fprintf(buf, "| %s ", paddedCell(row[i], t.Align[i], maxWidths[i]))
+		}
+		buf.WriteString("|\n")
+	}
+}
+
+func paddedCell(cell string, align string, w int) string {
+	n := w - len(cell)
+	pad := strings.Repeat(" ", n)
+	switch align {
+	default:
+		return cell + pad
+	case "right":
+		return pad + cell
+	case "center":
+		pad = pad[:n/2]
+		if n%2 == 0 {
+			return pad + cell + pad
+		} else {
+			return pad + cell + " " + pad
+		}
+	}
 }
 
 func (b *tableBuilder) build(p buildState) Block {
