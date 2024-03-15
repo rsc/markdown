@@ -160,7 +160,6 @@ func (t *Table) PrintHTML(buf *bytes.Buffer) {
 }
 
 func (t *Table) printMarkdown(buf *bytes.Buffer, s mdState) {
-	fmt.Printf("%#v\n", s)
 	// inline all Text values in Header and Rows to
 	// get final, rendered widths
 	var (
