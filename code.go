@@ -85,7 +85,7 @@ func (b *CodeBlock) printMarkdown(buf *bytes.Buffer, s mdState) {
 			fmt.Fprintf(buf, "%s%s%s\n", pre, "    ", line)
 		}
 	} else {
-		fmt.Fprintf(buf, "%s%s\n", prefix1, b.Fence)
+		fmt.Fprintf(buf, "%s%s%s\n", prefix1, b.Fence, b.Info)
 		for _, line := range b.Text {
 			fmt.Fprintf(buf, "%s%s\n", s.prefix, line)
 		}

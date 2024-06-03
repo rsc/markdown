@@ -116,6 +116,10 @@ tildes
 func f(int)
 ~~~~~
 done
+-- codeblock6 --
+```go
+func f(int)
+```
 -- htmlblock --
 Literally,
 <pre>
