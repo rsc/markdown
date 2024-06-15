@@ -10,7 +10,6 @@ import (
 
 type ThematicBreak struct {
 	Position
-	raw string
 }
 
 func (b *ThematicBreak) PrintHTML(buf *bytes.Buffer) {
@@ -19,13 +18,12 @@ func (b *ThematicBreak) PrintHTML(buf *bytes.Buffer) {
 
 func (b *ThematicBreak) printMarkdown(buf *bytes.Buffer, s mdState) {
 	buf.WriteString(s.prefix)
-	buf.WriteString(b.raw)
-	buf.WriteByte('\n')
+	buf.WriteString("***\n")
 }
 
 func newHR(p *parseState, s line) (line, bool) {
 	if isHR(s) {
-		p.doneBlock(&ThematicBreak{Position{p.lineno, p.lineno}, s.string()})
+		p.doneBlock(&ThematicBreak{Position{p.lineno, p.lineno}})
 		return line{}, true
 	}
 	return s, false

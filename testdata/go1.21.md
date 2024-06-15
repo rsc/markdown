@@ -49,11 +49,11 @@ Go 1.21 adds three new built-ins to the language.
 Package initialization order is now specified more precisely. The
 new algorithm is:
 
-- Sort all packages by import path.
-- Repeat until the list of packages is empty:
-  - Find the first package in the list for which all imports are
-    already initialized.
-  - Initialize that package and remove it from the list.
+  - Sort all packages by import path.
+  - Repeat until the list of packages is empty:
+      - Find the first package in the list for which all imports are
+        already initialized.
+      - Initialize that package and remove it from the list.
 
 This may change the behavior of some programs that rely on a
 specific initialization ordering that was not expressed by explicit

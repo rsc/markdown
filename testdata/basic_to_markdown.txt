@@ -46,6 +46,8 @@ bar*
 ***
 -- thematic2 --
    ------
+-- want --
+***
 -- thematic3 --
 First theme.
 ***
@@ -78,6 +80,10 @@ No space.
 ****
 ## foo
 ****
+-- want --
+***
+## foo
+***
 -- codeblock1 --
 As shown here:
 ```
@@ -127,59 +133,59 @@ Literally,
 <pre>
 Done.
 -- list_tight --
-- one
-- two
-- three
+  - one
+  - two
+  - three
 -- list_loose --
-- one
+  - one
 
-- two
+  - two
 
-- three
+  - three
 -- numlist_tight --
-1. Lather.
-2. Rinse.
-3. Repeat.
+ 1. Lather.
+ 2. Rinse.
+ 3. Repeat.
 -- numlist_tight_renumber --
-1) Lather.
-1) Rinse.
-2) Repeat.
+ 1) Lather.
+ 1) Rinse.
+ 2) Repeat.
 -- want --
-1) Lather.
-2) Rinse.
-3) Repeat.
+ 1) Lather.
+ 2) Rinse.
+ 3) Repeat.
 -- numlist_loose --
-1. Lather
-2. Rinse
+ 1. Lather
+ 2. Rinse
 
-3. Repeat
+ 3. Repeat
 -- want --
-1. Lather
+ 1. Lather
 
-2. Rinse
+ 2. Rinse
 
-3. Repeat
+ 3. Repeat
 -- list_lines_tight --
-- A first
-  item.
-- Items can span
-  lines.
-- Or not.
+  - A first
+    item.
+  - Items can span
+    lines.
+  - Or not.
 -- list_lines_loose --
-- A first
-  item.
+  - A first
+    item.
 
-- Items can span
-  lines.
+  - Items can span
+    lines.
 
-- Or not.
+  - Or not.
 -- list_nest --
-- Intro
-  1. first
-  2. second
-- Middle
-  * alpha
-- End
+  - Intro
+     1. first
+     2. second
+  - Middle
+      * alpha
+  - End
 -- list_indent --
 We have:
 
@@ -202,8 +208,8 @@ The end.
 > ### like a heading
 >
 > Or a list:
-> - a
-> - b
+>   - a
+>   - b
 >
 > ```
 > some code

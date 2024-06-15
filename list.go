@@ -21,7 +21,6 @@ type List struct {
 type Item struct {
 	Position
 	Blocks []Block
-	width  int
 }
 
 func (b *List) PrintHTML(buf *bytes.Buffer) {
@@ -62,11 +61,10 @@ func (b *List) printMarkdown(buf *bytes.Buffer, s mdState) {
 func (b *Item) printMarkdown(buf *bytes.Buffer, s mdState) {
 	var marker string
 	if s.bullet == '.' || s.bullet == ')' {
-		marker = fmt.Sprintf("%d%c ", s.num, s.bullet)
+		marker = fmt.Sprintf(" %d%c ", s.num, s.bullet)
 	} else {
-		marker = fmt.Sprintf("%c ", s.bullet)
+		marker = fmt.Sprintf("  %c ", s.bullet)
 	}
-	marker = strings.Repeat(" ", b.width-len(marker)) + marker
 	s.prefix1 = s.prefix + marker
 	s.prefix += strings.Repeat(" ", len(marker))
 	printMarkdownBlocks(b.Blocks, buf, s)
@@ -146,7 +144,7 @@ Loose:
 
 func (b *itemBuilder) build(p buildState) Block {
 	b.list.item = nil
-	return &Item{p.pos(), p.blocks(), b.width}
+	return &Item{p.pos(), p.blocks()}
 }
 
 func (c *listBuilder) extend(p *parseState, s line) (line, bool) {

@@ -266,11 +266,9 @@ func findUnexported(v reflect.Value) (reflect.Value, bool) {
 		}
 	case reflect.Struct:
 		for i := 0; i < v.Type().NumField(); i++ {
-			/*
-				if !v.Type().Field(i).IsExported() {
-					return v, true
-				}
-			*/
+			if !v.Type().Field(i).IsExported() {
+				return v, true
+			}
 			if u, ok := findUnexported(v.Field(i)); ok {
 				return u, true
 			}
