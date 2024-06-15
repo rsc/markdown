@@ -1185,3 +1185,11 @@ body
 [a](li(nk "title")
 -- 155.html --
 <p><a href="li(nk" title="title">a</a></p>
+-- 156.md --
+_H_ + _H_/2 + 2_H_ + 3
+-- 156.html --
+<p><em>H</em> + <em>H</em>/2 + 2_H_ + 3</p>
+-- 157.md --
+*H* + *H*/2 + 2*H* + 3
+-- 157.html --
+<p><em>H</em> + <em>H</em>/2 + 2<em>H</em> + 3</p>
