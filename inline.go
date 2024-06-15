@@ -128,11 +128,12 @@ func (x *Code) printMarkdown(buf *bytes.Buffer) {
 	// Use the fewest backticks we can, and add spaces as needed.
 	ticks := strings.Repeat("`", longestSequence(x.Text, '`')+1)
 	buf.WriteString(ticks)
-	if x.Text[0] == '`' {
+	space := x.Text[0] == '`' || x.Text[len(x.Text)-1] == '`'
+	if space {
 		buf.WriteByte(' ')
 	}
 	buf.WriteString(x.Text)
-	if x.Text[len(x.Text)-1] == '`' {
+	if space {
 		buf.WriteByte(' ')
 	}
 	buf.WriteString(ticks)

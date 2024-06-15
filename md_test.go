@@ -175,17 +175,22 @@ func TestFormat(t *testing.T) {
 				// or if followed by a file named "want", then by that file.
 				name := a.Files[i].Name
 				in := a.Files[i].Data
-				want := in
+				wantb := in
 				i++
 				if i < len(a.Files) && a.Files[i].Name == "want" {
-					want = a.Files[i].Data
+					wantb = a.Files[i].Data
 					i++
 				}
 				t.Run(name, func(t *testing.T) {
 					doc := p.Parse(decode(string(in)))
+					want := decode(string(wantb))
+					docWant := p.Parse(want)
+					if ToHTML(doc) != ToHTML(docWant) {
+						t.Errorf("bad testdata: input and want are different markdown documents:\ninput:\n%s\n\nwant:\n%s", dump(doc), dump(docWant))
+					}
 					h := Format(doc)
 					h = encode(h)
-					if h != string(want) {
+					if h != want {
 						t.Errorf("input %q\nparse: \n%s\nhave %q\nwant %q", in, dump(doc), h, want)
 					}
 				})
