@@ -248,6 +248,7 @@ func parseHTMLTag(p *parseState, s string, i int) (Inline, int, bool) {
 
 func parseHTMLOpenTag(p *parseState, s string, i int) (Inline, int, bool) {
 	if i >= len(s) || s[i] != '<' {
+		// unreachable unless called wrong
 		return nil, 0, false
 	}
 	// “An open tag consists of a < character, a tag name, zero or more attributes,

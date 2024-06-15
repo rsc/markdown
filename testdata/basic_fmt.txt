@@ -1,4 +1,6 @@
-Test cases for ToMarkdown.
+Test cases for Format.
+-- parser.json --
+{"Strikethrough": true}
 -- one --
 A single line.
 -- one_blank --
@@ -221,6 +223,18 @@ The end.
 -- inline_code1 --
 ` \[\` `
 -- inline_code2 --
+``\[\` ``
+-- want --
+``\[\` ``
+-- inline_code3 --
 `` \[\` ``
 -- want --
 `` \[\` ``
+-- parser.json --
+{"Strikethrough": true}
+-- strike --
+hello ~~world~~
+-- parser.json --
+{"Strikethrough": false}
+-- strike --
+hello ~~world~~

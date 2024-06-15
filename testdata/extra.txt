@@ -1199,3 +1199,62 @@ _H_ + _H_/2 + 2_H_ + 3
 <ul>
 <li><a href="https://golang.org/issue/26803">#26803 mime/multipart: add (*Reader).NextRawPart to avoid quoted-printable decoding</a> (9 comments, accepted)</li>
 </ul>
+-- 159.md --
+<pre>
+
+    foo
+
+</PRE>
+
+bar
+-- 159.html --
+<pre>
+
+    foo
+
+</PRE>
+<p>bar</p>
+-- 160.md --
+<!1
+-- 160.html --
+<p>&lt;!1</p>
+-- 161.md --
+``hello ``
+-- 161.html --
+<p><code>hello </code></p>
+-- parser.json --
+{"Strikethrough": true}
+-- 162.md --
+![~~hello~~ `co<d">e`](img.jpg)
+-- 162.html --
+<p><img src="img.jpg" alt="hello co&lt;d&quot;&gt;e" /></p>
+-- parser.json --
+{"Strikethrough": false}
+-- 162.md --
+![~~hello~~ `co<d">e`](img.jpg)
+-- 162.html --
+<p><img src="img.jpg" alt="~~hello~~ co&lt;d&quot;&gt;e" /></p>
+-- 162.md --
+![hello <teddy>](img.jpg)
+-- 162.html --
+<p><img src="img.jpg" alt="hello " /></p>
+-- 163.md --
+<abc/!>
+-- 163.html --
+<p>&lt;abc/!&gt;</p>
+-- parser.json --
+{"SmartQuote": true}
+-- 164.md --
+hello "the" world
+-- 164.html --
+<p>hello “the” world</p>
+-- 165.md --
+*"hello* *world"*
+-- 165.html --
+<p><em>“hello</em> <em>world”</em></p>
+-- parser.json --
+{"SmartQuote": false}
+-- 165.md --
+hello "the" world
+-- 165.html --
+<p>hello &quot;the&quot; world</p>

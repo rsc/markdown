@@ -86,9 +86,6 @@ func parseBreak(_ *parseState, s string, i int) (Inline, int, int, bool) {
 		start--
 	}
 	end := i + 1
-	for end < len(s) && (s[end] == ' ' || s[end] == '\t') {
-		end++
-	}
 	// TODO: Do tabs count? That would be a mess.
 	if i >= 2 && s[i-1] == ' ' && s[i-2] == ' ' {
 		return &HardBreak{}, start, end, true

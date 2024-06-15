@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"flag"
 	"go/token"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -44,10 +45,7 @@ func TestToHTML(t *testing.T) {
 			var ncase, npass int
 			for i := 0; i+2 <= len(a.Files); {
 				if a.Files[i].Name == "parser.json" {
-					p = Parser{}
-					if err := json.Unmarshal(a.Files[i].Data, &p); err != nil {
-						t.Fatal(err)
-					}
+					p = parseParser(t, a.Files[i].Data)
 					i++
 					continue
 				}
@@ -150,6 +148,21 @@ func encode(s string) string {
 	return s
 }
 
+func parseParser(t *testing.T, data []byte) Parser {
+	d := json.NewDecoder(bytes.NewReader(data))
+	d.DisallowUnknownFields()
+	var p Parser
+	err := d.Decode(&p)
+	if err != nil {
+		t.Fatalf("reading parser.json: %v", err)
+	}
+	err = d.Decode(new(json.RawMessage))
+	if err != io.EOF {
+		t.Fatalf("junk on end of parser.json")
+	}
+	return p
+}
+
 func TestFormat(t *testing.T) {
 	files, err := filepath.Glob(filepath.Join("testdata", "*_fmt.txt"))
 	if err != nil {
@@ -164,10 +177,7 @@ func TestFormat(t *testing.T) {
 			var p Parser
 			for i := 0; i < len(a.Files); {
 				if a.Files[i].Name == "parser.json" {
-					p = Parser{}
-					if err := json.Unmarshal(a.Files[i].Data, &p); err != nil {
-						t.Fatal(err)
-					}
+					p = parseParser(t, a.Files[i].Data)
 					i++
 					continue
 				}

@@ -122,13 +122,14 @@ func (x *Code) PrintHTML(buf *bytes.Buffer) {
 }
 
 func (x *Code) printMarkdown(buf *bytes.Buffer) {
-	if len(x.Text) == 0 {
-		return
-	}
 	// Use the fewest backticks we can, and add spaces as needed.
 	ticks := strings.Repeat("`", longestSequence(x.Text, '`')+1)
 	buf.WriteString(ticks)
-	space := x.Text[0] == '`' || x.Text[len(x.Text)-1] == '`'
+
+	// Note: len(x.Text)==0 is not possible to express in Markdown,
+	// but if someone makes a buggy Code, we print it as ` ` (a code-formatted space),
+	// since the only other choice would be to not print any code text at all, which is worse.
+	space := len(x.Text) == 0 || x.Text[0] == '`' || x.Text[len(x.Text)-1] == '`'
 	if space {
 		buf.WriteByte(' ')
 	}
@@ -434,9 +435,7 @@ Src:
 						d = 1
 					}
 					del := p.Text[0] == '~'
-					inner := dst[start.i+1:]
-					unEmphPlain(inner)
-					x := &Emph{Marker: p.Text[:d], Inner: append([]Inline(nil), inner...)}
+					x := &Emph{Marker: p.Text[:d], Inner: append([]Inline(nil), ps.mergePlain(dst[start.i+1:])...)}
 					start.Text = start.Text[:len(start.Text)-d]
 					p.Text = p.Text[d:]
 					if start.Text == "" {
@@ -479,16 +478,7 @@ Src:
 		}
 	}
 
-	unEmphPlain(dst)
-	return dst
-}
-
-func unEmphPlain(list []Inline) {
-	for i, x := range list {
-		if ep, ok := x.(*emphPlain); ok {
-			list[i] = &ep.Plain
-		}
-	}
+	return ps.mergePlain(dst)
 }
 
 func mdUnescape(s string) string {
@@ -554,11 +544,7 @@ func parseEscape(p *parseState, s string, i int) (Inline, int, int, bool) {
 			if i > 0 && s[i-1] == '\\' {
 				p.corner = true // goldmark mishandles \\\ newline
 			}
-			end := i + 2
-			for end < len(s) && (s[end] == ' ' || s[end] == '\t') {
-				end++
-			}
-			return &HardBreak{}, i, end, true
+			return &HardBreak{}, i, i + 2, true
 		}
 	}
 	return nil, 0, 0, false
@@ -912,13 +898,12 @@ func (p *parseState) mergePlain(list []Inline) []Inline {
 }
 
 func toPlain(x Inline) *Plain {
+	// Note: openPlain handled in p.emph Src loop.
 	// TODO what about Escaped?
 	switch x := x.(type) {
 	case *Plain:
 		return x
 	case *emphPlain:
-		return &x.Plain
-	case *openPlain:
 		return &x.Plain
 	}
 	return nil

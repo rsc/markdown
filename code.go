@@ -18,9 +18,6 @@ type CodeBlock struct {
 }
 
 func (b *CodeBlock) PrintHTML(buf *bytes.Buffer) {
-	if buf.Len() > 0 && buf.Bytes()[buf.Len()-1] != '\n' {
-		buf.WriteString("\n")
-	}
 	buf.WriteString("<pre><code")
 	if b.Info != "" {
 		// https://spec.commonmark.org/0.30/#info-string
