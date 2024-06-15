@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// curl https://spec.commonmark.org/0.30/spec.json | go run spec2txtar.go > spec0.30.txt
+// go run spec2txtar.go https://spec.commonmark.org/0.30/spec.json > spec0.30.txt
 
 package main
 

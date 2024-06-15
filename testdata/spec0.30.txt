@@ -4434,17 +4434,6 @@ comment - with hyphen -->
 -- 624.html --
 <p>foo <!-- this is a
 comment - with hyphen --></p>
--- 625.md --
-foo <!-- not a comment -- two hyphens -->
--- 625.html --
-<p>foo &lt;!-- not a comment -- two hyphens --&gt;</p>
--- 626.md --
-foo <!--> foo -->
-
-foo <!-- foo--->
--- 626.html --
-<p>foo &lt;!--&gt; foo --&gt;</p>
-<p>foo &lt;!-- foo---&gt;</p>
 -- 627.md --
 foo <?php echo $a; ?>
 -- 627.html --

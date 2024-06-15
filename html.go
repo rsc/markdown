@@ -393,13 +393,16 @@ func parseHTMLComment(s string, i int) (Inline, int, bool) {
 	// “An HTML comment consists of <!-- + text + -->,
 	// where text does not start with > or ->,
 	// does not end with -, and does not contain --.”
-	if !strings.HasPrefix(s[i:], "<!-->") &&
-		!strings.HasPrefix(s[i:], "<!--->") {
-		if x, end, ok := parseHTMLMarker(s, i, "<!--", "-->"); ok {
-			if t := x.(*HTMLTag).Text; !strings.Contains(t[len("<!--"):len(t)-len("->")], "--") {
-				return x, end, ok
-			}
-		}
+	if strings.HasPrefix(s[i:], "<!-->") {
+		end := i + len("<!-->")
+		return &HTMLTag{s[i:end]}, end, true
+	}
+	if strings.HasPrefix(s[i:], "<!--->") {
+		end := i + len("<!--->")
+		return &HTMLTag{s[i:end]}, end, true
+	}
+	if x, end, ok := parseHTMLMarker(s, i, "<!--", "-->"); ok {
+		return x, end, ok
 	}
 	return nil, 0, false
 }

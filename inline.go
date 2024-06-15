@@ -806,7 +806,7 @@ func isUnicodePunct(r rune) bool {
 	if r < 0x80 {
 		return isPunct(byte(r))
 	}
-	return unicode.In(r, unicode.Punct)
+	return unicode.In(r, unicode.Punct, unicode.Symbol)
 }
 
 func (p *parseState) parseLinkClose(s string, i int, open *openPlain) (*Link, int, bool) {
