@@ -338,7 +338,7 @@ func (p *parseState) inline(s string) []Inline {
 			opens = opens[:len(opens)-1]
 			if open.Text[0] == '!' || lastLinkOpen <= open.i {
 				if x, end, ok := p.parseLinkClose(s, i, open); ok {
-					p.corner = p.corner || x.corner || linkCorner(x.URL)
+					p.corner = p.corner || linkCorner(x.URL)
 					p.emit(i)
 					x.Inner = p.emph(nil, p.list[oi+1:])
 					if open.Text[0] == '!' {
@@ -433,7 +433,9 @@ Src:
 						d = 1
 					}
 					del := p.Text[0] == '~'
-					x := &Emph{Marker: p.Text[:d], Inner: append([]Inline(nil), dst[start.i+1:]...)}
+					inner := dst[start.i+1:]
+					unEmphPlain(inner)
+					x := &Emph{Marker: p.Text[:d], Inner: append([]Inline(nil), inner...)}
 					start.Text = start.Text[:len(start.Text)-d]
 					p.Text = p.Text[d:]
 					if start.Text == "" {
@@ -475,7 +477,17 @@ Src:
 			}
 		}
 	}
+
+	unEmphPlain(dst)
 	return dst
+}
+
+func unEmphPlain(list []Inline) {
+	for i, x := range list {
+		if ep, ok := x.(*emphPlain); ok {
+			list[i] = &ep.Plain
+		}
+	}
 }
 
 func mdUnescape(s string) string {
@@ -805,7 +817,6 @@ func (p *parseState) parseLinkClose(s string, i int, open *openPlain) (*Link, in
 			i := skipSpace(s, i+2)
 			var dest, title string
 			var titleChar byte
-			var corner bool
 			if i < len(s) && s[i] != ')' {
 				var ok bool
 				dest, i, ok = parseLinkDest(s, i)
@@ -816,7 +827,7 @@ func (p *parseState) parseLinkClose(s string, i int, open *openPlain) (*Link, in
 				if i < len(s) && s[i] != ')' {
 					title, titleChar, i, ok = parseLinkTitle(s, i)
 					if title == "" {
-						corner = true
+						p.corner = true
 					}
 					if !ok {
 						break
@@ -825,7 +836,7 @@ func (p *parseState) parseLinkClose(s string, i int, open *openPlain) (*Link, in
 				}
 			}
 			if i < len(s) && s[i] == ')' {
-				return &Link{URL: dest, Title: title, TitleChar: titleChar, corner: corner}, i + 1, true
+				return &Link{URL: dest, Title: title, TitleChar: titleChar}, i + 1, true
 			}
 			// NOTE: Test malformed ( ) with shortcut reference
 			// TODO fall back on syntax error?
@@ -837,7 +848,7 @@ func (p *parseState) parseLinkClose(s string, i int, open *openPlain) (*Link, in
 				break
 			}
 			if link, ok := p.links[normalizeLabel(label)]; ok {
-				return &Link{URL: link.URL, Title: link.Title, corner: link.corner}, i, true
+				return &Link{URL: link.URL, Title: link.Title}, i, true
 			}
 			// Note: Could break here, but CommonMark dingus does not
 			// fall back to trying Text for [Text][Label] when Label is unknown.
@@ -853,7 +864,7 @@ func (p *parseState) parseLinkClose(s string, i int, open *openPlain) (*Link, in
 	}
 
 	if link, ok := p.links[normalizeLabel(s[open.i:i])]; ok {
-		return &Link{URL: link.URL, Title: link.Title, corner: link.corner}, end, true
+		return &Link{URL: link.URL, Title: link.Title}, end, true
 	}
 	return nil, 0, false
 }

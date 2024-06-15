@@ -107,7 +107,6 @@ func (p *parseState) deleteLast() {
 type Text struct {
 	Position
 	Inline []Inline
-	raw    string
 }
 
 func (b *Text) PrintHTML(buf *bytes.Buffer) {
@@ -204,14 +203,19 @@ type parseState struct {
 
 	// for fixup at end
 	lists []*List
-	texts []*Text
+	texts []textRaw
 
 	backticks backtickParser
 }
 
+type textRaw struct {
+	*Text
+	raw string
+}
+
 func (p *parseState) newText(pos Position, text string) *Text {
-	b := &Text{Position: pos, raw: text}
-	p.texts = append(p.texts, b)
+	b := &Text{Position: pos}
+	p.texts = append(p.texts, textRaw{b, text})
 	return b
 }
 

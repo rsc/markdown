@@ -8,9 +8,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
+	"go/token"
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -64,6 +66,10 @@ func TestToHTML(t *testing.T) {
 					if h != string(html.Data) {
 						q := strings.ReplaceAll(url.QueryEscape(decode(string(md.Data))), "+", "%20")
 						t.Fatalf("input %q\nparse:\n%s\nhave %q\nwant %q\ndingus: (https://spec.commonmark.org/dingus/?text=%s)\ngithub: (https://github.com/rsc/tmp/issues/new?body=%s)", md.Data, dump(doc), h, html.Data, q, q)
+					}
+
+					if x, ok := findUnexported(reflect.ValueOf(doc)); ok {
+						t.Fatalf("input %q\nparse:\n%s\nfound parsed value of unexported type %s", md.Data, dump(doc), x.Type())
 					}
 					npass++
 				})
@@ -245,4 +251,36 @@ func TestCodeToMarkdown(t *testing.T) {
 			t.Errorf("%q: got %q, want %q", test.content, got, test.want)
 		}
 	}
+}
+
+func findUnexported(v reflect.Value) (reflect.Value, bool) {
+	if t := v.Type(); t.PkgPath() != "" && !token.IsExported(t.Name()) {
+		return v, true
+	}
+	switch v.Kind() {
+	case reflect.Interface, reflect.Pointer:
+		if !v.IsNil() {
+			if u, ok := findUnexported(v.Elem()); ok {
+				return u, true
+			}
+		}
+	case reflect.Struct:
+		for i := 0; i < v.Type().NumField(); i++ {
+			/*
+				if !v.Type().Field(i).IsExported() {
+					return v, true
+				}
+			*/
+			if u, ok := findUnexported(v.Field(i)); ok {
+				return u, true
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			if u, ok := findUnexported(v.Index(i)); ok {
+				return u, true
+			}
+		}
+	}
+	return v, false
 }

@@ -55,7 +55,6 @@ func parseLinkRefDef(p buildState, s string) (int, bool) {
 
 	var title string
 	var titleChar byte
-	var corner bool
 	if moved {
 		for j < len(s) && (s[j] == ' ' || s[j] == '\t') {
 			j++
@@ -69,7 +68,7 @@ func parseLinkRefDef(p buildState, s string) (int, bool) {
 				if t == "" {
 					// Goldmark adds title="" in this case.
 					// We do not, nor does the Dingus.
-					corner = true
+					p.(*parseState).corner = true
 				}
 				title = t
 				titleChar = c
@@ -87,7 +86,7 @@ func parseLinkRefDef(p buildState, s string) (int, bool) {
 
 	label = normalizeLabel(label)
 	if p.link(label) == nil {
-		p.defineLink(label, &Link{URL: dest, Title: title, TitleChar: titleChar, corner: corner})
+		p.defineLink(label, &Link{URL: dest, Title: title, TitleChar: titleChar})
 	}
 	return i, true
 }
@@ -399,7 +398,6 @@ type Link struct {
 	URL       string
 	Title     string
 	TitleChar byte // ', " or )
-	corner    bool
 }
 
 func (*Link) Inline() {}
@@ -454,7 +452,6 @@ type Image struct {
 	URL       string
 	Title     string
 	TitleChar byte
-	corner    bool
 }
 
 func (*Image) Inline() {}
