@@ -220,35 +220,6 @@ func TestFormat(t *testing.T) {
 	}
 }
 
-func TestHeadingIDToMarkdown(t *testing.T) {
-	p := Parser{HeadingIDs: true}
-	text := `# H {#id}`
-	doc := p.Parse(text)
-	have := Format(doc)
-	want := text + "\n"
-	if have != want {
-		t.Errorf("have %q, want %q", have, want)
-	}
-}
-
-func TestFormatCode(t *testing.T) {
-	for _, test := range []struct {
-		content, want string
-	}{
-		{"x", "`x`"},
-		{"`x`", "`` `x` ``"},
-		{"a ``` b``", "````a ``` b`` ````"},
-	} {
-		c := &Code{Text: test.content}
-		var buf bytes.Buffer
-		c.printMarkdown(&buf)
-		have := buf.String()
-		if have != test.want {
-			t.Errorf("%q: have %q, want %q", test.content, have, test.want)
-		}
-	}
-}
-
 func findUnexported(v reflect.Value) (reflect.Value, bool) {
 	if t := v.Type(); t.PkgPath() != "" && !token.IsExported(t.Name()) {
 		return v, true
@@ -277,4 +248,22 @@ func findUnexported(v reflect.Value) (reflect.Value, bool) {
 		}
 	}
 	return v, false
+}
+
+func TestInline(t *testing.T) {
+	// Test that these don't crash,
+	// and also "cover" the bodies.
+	new(HardBreak).Inline()
+	new(SoftBreak).Inline()
+	new(HTMLTag).Inline()
+	new(Plain).Inline()
+	new(Code).Inline()
+	new(Strong).Inline()
+	new(Del).Inline()
+	new(Emph).Inline()
+	new(Emoji).Inline()
+	new(AutoLink).Inline()
+	new(Link).Inline()
+	new(Image).Inline()
+	new(Task).Inline()
 }

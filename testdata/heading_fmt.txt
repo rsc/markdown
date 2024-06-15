@@ -1,0 +1,6 @@
+-- parser.json --
+{"HeadingIDs": true}
+-- 1 --
+#  H  {# id }
+-- want --
+# H {#id}

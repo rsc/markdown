@@ -103,7 +103,7 @@ func extractID(p *parseState, s string) (id, s2 string) {
 		p.corner = true // goldmark accepts {#}
 		return "", s
 	}
-	return s[i+2 : j], s[:i]
+	return id, s[:i]
 }
 
 func newSetextHeading(p *parseState, s line) (line, bool) {
