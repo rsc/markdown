@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	wflag = flag.Bool("w", false, "write reformatted Markdown to files ")
+	wflag = flag.Bool("w", false, "write reformatted Markdown back to input files")
 	exit  = 0
 )
 
@@ -64,7 +64,7 @@ func main() {
 func convert(data []byte, file string) {
 	var p markdown.Parser
 	doc := p.Parse(string(data))
-	out := []byte(markdown.ToMarkdown(doc))
+	out := []byte(markdown.Format(doc))
 	if *wflag && file != "" {
 		if err := os.WriteFile(file, out, 0666); err != nil {
 			log.Print(err)

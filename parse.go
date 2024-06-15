@@ -575,7 +575,7 @@ func ToHTML(b Block) string {
 	return buf.String()
 }
 
-func ToMarkdown(b Block) string {
+func Format(b Block) string {
 	var buf bytes.Buffer
 	b.printMarkdown(&buf, mdState{})
 	s := buf.String()

@@ -31,7 +31,7 @@ func TestToHTML(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, file := range files {
-		if strings.HasSuffix(file, "to_markdown.txt") {
+		if strings.HasSuffix(file, "_fmt.txt") {
 			continue
 		}
 		t.Run(strings.TrimSuffix(filepath.Base(file), ".txt"), func(t *testing.T) {
@@ -150,16 +150,13 @@ func encode(s string) string {
 	return s
 }
 
-func TestToMarkdown(t *testing.T) {
-	// txtar files end in "_to_markdown.txt" and use the same encoding as
-	// for the HTML tests.
-	const suffix = "_to_markdown.txt"
-	files, err := filepath.Glob(filepath.Join("testdata", "*"+suffix))
+func TestFormat(t *testing.T) {
+	files, err := filepath.Glob(filepath.Join("testdata", "*_fmt.txt"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, file := range files {
-		t.Run(strings.TrimSuffix(filepath.Base(file), suffix), func(t *testing.T) {
+		t.Run(strings.TrimSuffix(filepath.Base(file), ".txt"), func(t *testing.T) {
 			a, err := txtar.ParseFile(file)
 			if err != nil {
 				t.Fatal(err)
@@ -186,7 +183,7 @@ func TestToMarkdown(t *testing.T) {
 				}
 				t.Run(name, func(t *testing.T) {
 					doc := p.Parse(decode(string(in)))
-					h := ToMarkdown(doc)
+					h := Format(doc)
 					h = encode(h)
 					if h != string(want) {
 						t.Errorf("input %q\nparse: \n%s\nhave %q\nwant %q", in, dump(doc), h, want)
@@ -210,7 +207,7 @@ func TestToMarkdown(t *testing.T) {
 			w := string(data)
 			var p Parser
 			doc := p.Parse(w)
-			h := ToMarkdown(doc)
+			h := Format(doc)
 			if h != w {
 				t.Errorf("have:\n%s\nwant:\n%s", h, w)
 				outfile := file + ".have"
@@ -227,15 +224,14 @@ func TestHeadingIDToMarkdown(t *testing.T) {
 	p := Parser{HeadingIDs: true}
 	text := `# H {#id}`
 	doc := p.Parse(text)
-	got := ToMarkdown(doc)
+	have := Format(doc)
 	want := text + "\n"
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
+	if have != want {
+		t.Errorf("have %q, want %q", have, want)
 	}
 }
 
-// Code.ToMarkdown computed the fewer number of ticks for the content.
-func TestCodeToMarkdown(t *testing.T) {
+func TestFormatCode(t *testing.T) {
 	for _, test := range []struct {
 		content, want string
 	}{
@@ -246,9 +242,9 @@ func TestCodeToMarkdown(t *testing.T) {
 		c := &Code{Text: test.content}
 		var buf bytes.Buffer
 		c.printMarkdown(&buf)
-		got := buf.String()
-		if got != test.want {
-			t.Errorf("%q: got %q, want %q", test.content, got, test.want)
+		have := buf.String()
+		if have != test.want {
+			t.Errorf("%q: have %q, want %q", test.content, have, test.want)
 		}
 	}
 }
