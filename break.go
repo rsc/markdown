@@ -16,9 +16,9 @@ func (b *ThematicBreak) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("<hr />\n")
 }
 
-func (b *ThematicBreak) printMarkdown(buf *bytes.Buffer, s mdState) {
-	buf.WriteString(s.prefix)
-	buf.WriteString("***\n")
+func (b *ThematicBreak) printMarkdown(buf *markOut, s mdState) {
+	buf.maybeNL()
+	buf.WriteString("***")
 }
 
 func newHR(p *parseState, s line) (line, bool) {
@@ -56,8 +56,9 @@ func (x *HardBreak) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("<br />\n")
 }
 
-func (x *HardBreak) printMarkdown(buf *bytes.Buffer) {
-	buf.WriteString("\\\n")
+func (x *HardBreak) printMarkdown(buf *markOut) {
+	buf.WriteString("\\")
+	buf.NL()
 }
 
 func (x *HardBreak) PrintText(buf *bytes.Buffer) {
@@ -72,8 +73,8 @@ func (x *SoftBreak) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("\n")
 }
 
-func (x *SoftBreak) printMarkdown(buf *bytes.Buffer) {
-	buf.WriteString("\n")
+func (x *SoftBreak) printMarkdown(buf *markOut) {
+	buf.NL()
 }
 
 func (x *SoftBreak) PrintText(buf *bytes.Buffer) {

@@ -7,6 +7,7 @@ package markdown
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -385,7 +386,7 @@ func (x *AutoLink) PrintHTML(buf *bytes.Buffer) {
 	fmt.Fprintf(buf, "<a href=\"%s\">%s</a>", htmlLinkEscaper.Replace(x.URL), htmlEscaper.Replace(x.Text))
 }
 
-func (x *AutoLink) printMarkdown(buf *bytes.Buffer) {
+func (x *AutoLink) printMarkdown(buf *markOut) {
 	fmt.Fprintf(buf, "<%s>", x.Text)
 }
 
@@ -414,31 +415,68 @@ func (x *Link) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("</a>")
 }
 
-func (x *Link) printMarkdown(buf *bytes.Buffer) {
+func (x *Link) printMarkdown(buf *markOut) {
 	buf.WriteByte('[')
 	x.printRemainingMarkdown(buf)
 }
 
-func (x *Link) printRemainingMarkdown(buf *bytes.Buffer) {
+func printLinks(buf *markOut, links map[string]*Link) {
+	// Print links sorted by keys for deterministic output.
+	var keys []string
+	for k := range links {
+		if k != "" {
+			keys = append(keys, k)
+		}
+	}
+	slices.Sort(keys)
+	for _, k := range keys {
+		l := links[k]
+		u := l.URL
+		if u == "" || strings.ContainsAny(u, " ") {
+			u = "<" + u + ">"
+		}
+		fmt.Fprintf(buf, "[%s]: %s", k, u)
+		printLinkTitleMarkdown(buf, l.Title, l.TitleChar)
+		buf.NL()
+	}
+}
+
+func (x *Link) printRemainingMarkdown(buf *markOut) {
 	for _, c := range x.Inner {
 		c.printMarkdown(buf)
 	}
 	buf.WriteString("](")
-	buf.WriteString(x.URL)
+	u := mdLinkEscaper.Replace(x.URL)
+	if u == "" || strings.ContainsAny(u, " ") {
+		u = "<" + u + ">"
+	}
+	buf.WriteString(u)
 	printLinkTitleMarkdown(buf, x.Title, x.TitleChar)
 	buf.WriteByte(')')
 }
 
-func printLinkTitleMarkdown(buf *bytes.Buffer, title string, titleChar byte) {
+func printLinkTitleMarkdown(buf *markOut, title string, titleChar byte) {
 	if title == "" {
 		return
+	}
+	if titleChar == 0 {
+		titleChar = '\''
 	}
 	closeChar := titleChar
 	openChar := closeChar
 	if openChar == ')' {
 		openChar = '('
 	}
-	fmt.Fprintf(buf, " %c%s%c", openChar, title /*TODO(jba): escape*/, closeChar)
+	buf.WriteString(" ")
+	buf.WriteByte(openChar)
+	for i, line := range strings.Split(mdEscaper.Replace(title), "\n") {
+		if i > 0 {
+			buf.NL()
+		}
+		buf.WriteString(line)
+		buf.noTrim()
+	}
+	buf.WriteByte(closeChar)
 }
 
 func (x *Link) PrintText(buf *bytes.Buffer) {
@@ -480,7 +518,7 @@ func (x *Image) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString(" />")
 }
 
-func (x *Image) printMarkdown(buf *bytes.Buffer) {
+func (x *Image) printMarkdown(buf *markOut) {
 	buf.WriteString("![")
 	(*Link)(x).printRemainingMarkdown(buf)
 }

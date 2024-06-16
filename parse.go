@@ -6,8 +6,6 @@ package markdown
 
 import (
 	"bytes"
-	"fmt"
-	"slices"
 	"strings"
 )
 
@@ -30,9 +28,110 @@ preserve LinkRefDefs?
 
 */
 
+type markOut struct {
+	bytes.Buffer
+	prefix      []byte
+	prefixOld   []byte
+	prefixOlder []byte
+	loose       int
+	tight       int
+	trimLimit   int
+}
+
+func (b *markOut) noTrim() {
+	b.trimLimit = len(b.Bytes())
+}
+
+func (b *markOut) NL() {
+	text := b.Bytes()
+	for len(text) > b.trimLimit && text[len(text)-1] == ' ' {
+		text = text[:len(text)-1]
+	}
+	b.Truncate(len(text))
+
+	b.Buffer.WriteByte('\n')
+	b.Buffer.Write(b.prefix)
+	b.prefixOlder, b.prefixOld = b.prefixOld, b.prefix
+}
+
+func (b *markOut) maybeNL() bool {
+	// Starting a new block that may need a blank line before it
+	// to avoid being mixed into a previous block
+	// as paragraph continuation text.
+	//
+	// If the prefix on the current line (all of cur)
+	// is the same as the current continuation prefix
+	// (not first line of a list item)
+	// and the previous line started with the same prefix,
+	// then we need a blank line to avoid looking like
+	// paragraph continuation text.
+	before, cur := cutLastNL(b.Bytes())
+	before, prev := cutLastNL(before)
+	if b.Len() > 0 && bytes.Equal(cur, b.prefix) && bytes.HasPrefix(prev, b.prefix) {
+		b.NL()
+		return true
+	}
+	return true
+}
+
+func cutLastNL(text []byte) (prefix, last []byte) {
+	i := bytes.LastIndexByte(text, '\n')
+	if i < 0 {
+		return nil, text
+	}
+	return text[:i], text[i+1:]
+}
+
+func (b *markOut) maybeQuoteNL(quote byte) bool {
+	// Starting a new quote block.
+	// Make sure it doesn't look like it is part of a preceding quote block.
+	before, cur := cutLastNL(b.Bytes())
+	before, prev := cutLastNL(before)
+	if len(prev) >= len(cur)+1 && bytes.HasPrefix(prev, cur) && prev[len(cur)] == quote {
+		b.NL()
+		return true
+	}
+	return false
+}
+
+func (b *markOut) WriteByte(c byte) error {
+	if c == '\n' {
+		panic("Write \\n")
+	}
+	return b.Buffer.WriteByte(c)
+}
+
+func (b *markOut) Write(p []byte) (int, error) {
+	for i := range p {
+		if p[i] == '\n' {
+			panic("Write \\n")
+		}
+	}
+	return b.Buffer.Write(p)
+}
+
+func (b *markOut) WriteString(s string) (int, error) {
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\n' {
+			panic("Write \\n")
+		}
+	}
+	return b.Buffer.WriteString(s)
+}
+
+func (b *markOut) push(s string) int {
+	n := len(b.prefix)
+	b.prefix = append(b.prefix, s...)
+	return n
+}
+
+func (b *markOut) pop(n int) {
+	b.prefix = b.prefix[:n]
+}
+
 // Block is implemented by:
 //
-//	CodeBLock
+//	CodeBlock
 //	Document
 //	Empty
 //	HTMLBlock
@@ -46,14 +145,12 @@ preserve LinkRefDefs?
 type Block interface {
 	Pos() Position
 	PrintHTML(buf *bytes.Buffer)
-	printMarkdown(buf *bytes.Buffer, s mdState)
+	printMarkdown(buf *markOut, s mdState)
 }
 
 type mdState struct {
-	prefix  string
-	prefix1 string // for first line only
-	bullet  rune   // for list items
-	num     int    // for numbered list items
+	bullet rune // for list items
+	num    int  // for numbered list items
 }
 
 type Position struct {
@@ -114,22 +211,10 @@ func (b *Text) PrintHTML(buf *bytes.Buffer) {
 	}
 }
 
-func (b *Text) printMarkdown(buf *bytes.Buffer, s mdState) {
-	if s.prefix1 != "" {
-		buf.WriteString(s.prefix1)
-	} else {
-		buf.WriteString(s.prefix)
-	}
-	var prev Inline
+func (b *Text) printMarkdown(buf *markOut, s mdState) {
 	for _, x := range b.Inline {
-		switch prev.(type) {
-		case *SoftBreak, *HardBreak:
-			buf.WriteString(s.prefix)
-		}
 		x.printMarkdown(buf)
-		prev = x
 	}
-	buf.WriteByte('\n')
 }
 
 type rootBuilder struct{}
@@ -278,6 +363,37 @@ func (p *Parser) parse(text string) (d *Document, corner bool) {
 			ps.taskList(list)
 		}
 	}
+
+	var fixBlock func(Block)
+
+	fixBlocks := func(blocks []Block) []Block {
+		keep := blocks[:0]
+		for _, b := range blocks {
+			fixBlock(b)
+			if _, ok := b.(*Empty); ok {
+				continue
+			}
+			keep = append(keep, b)
+		}
+		return keep
+	}
+
+	fixBlock = func(x Block) {
+		switch x := x.(type) {
+		case *Document:
+			x.Blocks = fixBlocks(x.Blocks)
+		case *Quote:
+			x.Blocks = fixBlocks(x.Blocks)
+		case *List:
+			for _, item := range x.Items {
+				fixBlock(item)
+			}
+		case *Item:
+			x.Blocks = fixBlocks(x.Blocks)
+		}
+	}
+
+	fixBlock(ps.root)
 
 	return ps.root, ps.corner
 }
@@ -578,14 +694,9 @@ func ToHTML(b Block) string {
 }
 
 func Format(b Block) string {
-	var buf bytes.Buffer
+	var buf markOut
 	b.printMarkdown(&buf, mdState{})
-	s := buf.String()
-	// Remove final extra newline.
-	if strings.HasSuffix(s, "\n\n") {
-		s = s[:len(s)-1]
-	}
-	return s
+	return buf.String()
 }
 
 func (b *Document) PrintHTML(buf *bytes.Buffer) {
@@ -594,34 +705,37 @@ func (b *Document) PrintHTML(buf *bytes.Buffer) {
 	}
 }
 
-func (b *Document) printMarkdown(buf *bytes.Buffer, s mdState) {
+func (b *Document) printMarkdown(buf *markOut, s mdState) {
 	printMarkdownBlocks(b.Blocks, buf, s)
-	// Print links sorted by keys for deterministic output.
-	var keys []string
-	for k := range b.Links {
-		keys = append(keys, k)
+
+	// Terminate with a single newline.
+	text := buf.Bytes()
+	w := len(text)
+	for w > 0 && text[w-1] == '\n' {
+		w--
 	}
-	slices.Sort(keys)
-	for _, k := range keys {
-		l := b.Links[k]
-		fmt.Fprintf(buf, "[%s]: %s", k, l.URL)
-		printLinkTitleMarkdown(buf, l.Title, l.TitleChar)
-		buf.WriteByte('\n')
+	buf.Truncate(w)
+	if w > 0 {
+		buf.NL()
+	}
+
+	// Add link reference definitions.
+	if len(b.Links) > 0 {
+		if buf.Len() > 0 {
+			buf.NL()
+		}
+		printLinks(buf, b.Links)
 	}
 }
 
-func printMarkdownBlocks(bs []Block, buf *bytes.Buffer, s mdState) {
-	prevEnd := 0
-	for _, b := range bs {
-		// Preserve blank lines between blocks.
-		if prevEnd > 0 {
-			for i := prevEnd + 1; i < b.Pos().StartLine; i++ {
-				buf.WriteString(trimRightSpaceTab(s.prefix))
-				buf.WriteByte('\n')
+func printMarkdownBlocks(bs []Block, buf *markOut, s mdState) {
+	for bn, b := range bs {
+		if bn > 0 {
+			buf.NL() // end block
+			if buf.loose > 0 {
+				buf.NL()
 			}
 		}
 		b.printMarkdown(buf, s)
-		prevEnd = b.Pos().EndLine
-		s.prefix1 = "" // item prefix only for first block
 	}
 }

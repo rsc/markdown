@@ -52,6 +52,7 @@ bar*
 ***
 -- thematic3 --
 First theme.
+
 ***
 
 Second theme.
@@ -77,6 +78,7 @@ No space.
 More.
 
 ### H3
+
 No space.
 -- heading3 --
 ****
@@ -84,13 +86,23 @@ No space.
 ****
 -- want --
 ***
+
 ## foo
+
 ***
 -- codeblock1 --
 As shown here:
 ```
 func f(int)
 ```
+And more.
+-- want --
+As shown here:
+
+```
+func f(int)
+```
+
 And more.
 -- codeblock2 --
 As shown here:
@@ -124,6 +136,14 @@ tildes
 func f(int)
 ~~~~~
 done
+-- want --
+tildes
+
+~~~~~
+func f(int)
+~~~~~
+
+done
 -- codeblock6 --
 ```go
 func f(int)
@@ -132,7 +152,15 @@ func f(int)
 Literally,
 <pre>
   something
+</pre>
+Done.
+-- want --
+Literally,
+
 <pre>
+  something
+</pre>
+
 Done.
 -- list_tight --
   - one
@@ -207,9 +235,11 @@ As Celine said:
 The end.
 -- quote2 --
 > Anything can be quoted.
+>
 > ### like a heading
 >
 > Or a list:
+>
 >   - a
 >   - b
 >
@@ -298,5 +328,19 @@ hello :fire:
     tab
 
   - list
+
       - sublist
         tab
+-- escaping --
+<!-- https://go.dev/issue/50332 -->
+The `go` subcommands now accept
+`-C` `<dir>` to change directory to \<dir>
+before performing the command, which may be useful for scripts that need to
+execute commands in multiple different modules.
+-- want --
+<!-- https://go.dev/issue/50332 -->
+
+The `go` subcommands now accept
+`-C` `<dir>` to change directory to \<dir>
+before performing the command, which may be useful for scripts that need to
+execute commands in multiple different modules.

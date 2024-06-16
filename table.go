@@ -159,7 +159,7 @@ func (t *Table) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("</table>\n")
 }
 
-func (t *Table) printMarkdown(buf *bytes.Buffer, s mdState) {
+func (t *Table) printMarkdown(buf *markOut, s mdState) {
 	// inline all Text values in Header and Rows to
 	// get final, rendered widths
 	var (
@@ -167,7 +167,7 @@ func (t *Table) printMarkdown(buf *bytes.Buffer, s mdState) {
 		rows      = make([][]string, 0, len(t.Rows))
 		maxWidths = make([]int, len(t.Header))
 
-		xb = &bytes.Buffer{}
+		xb = &markOut{}
 		xs string
 	)
 
@@ -195,15 +195,15 @@ func (t *Table) printMarkdown(buf *bytes.Buffer, s mdState) {
 		rows = append(rows, xrow)
 	}
 
-	buf.WriteString(s.prefix)
+	buf.maybeQuoteNL('|')
 	for i, cell := range hdr {
 		buf.WriteString("| ")
 		pad(buf, cell, t.Align[i], maxWidths[i])
 		buf.WriteString(" ")
 	}
-	buf.WriteString("|\n")
+	buf.WriteString("|")
 
-	buf.WriteString(s.prefix)
+	buf.NL()
 	for i, a := range t.Align {
 		w := maxWidths[i]
 		buf.WriteString("| ")
@@ -223,26 +223,26 @@ func (t *Table) printMarkdown(buf *bytes.Buffer, s mdState) {
 		}
 		buf.WriteString(" ")
 	}
-	buf.WriteString("|\n")
+	buf.WriteString("|")
 
 	for _, row := range rows {
-		buf.WriteString(s.prefix)
+		buf.NL()
 		for i := range t.Header {
 			buf.WriteString("| ")
 			pad(buf, row[i], t.Align[i], maxWidths[i])
 			buf.WriteString(" ")
 		}
-		buf.WriteString("|\n")
+		buf.WriteString("|")
 	}
 }
 
-func repeat(buf *bytes.Buffer, c byte, n int) {
+func repeat(buf *markOut, c byte, n int) {
 	for i := 0; i < n; i++ {
 		buf.WriteByte(c)
 	}
 }
 
-func pad(buf *bytes.Buffer, cell, align string, w int) {
+func pad(buf *markOut, cell, align string, w int) {
 	n := w - utf8.RuneCountInString(cell)
 	switch align {
 	default:

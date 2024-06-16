@@ -27,6 +27,88 @@ import (
 
 var goldmarkFlag = flag.Bool("goldmark", false, "run goldmark tests")
 
+var roundTripFailures = map[string]bool{
+	"TestToHTML/extra/13":  true, // indentation of tag
+	"TestToHTML/extra/75":  true, // weird list
+	"TestToHTML/extra/76":  true, // weird list
+	"TestToHTML/extra/115": true, // weird list
+
+	"TestToHTML/gfm_ext/9":  true, // table
+	"TestToHTML/gfm_ext/11": true, // table
+
+	"TestToHTML/spec0.29/19":  true, // thematic break
+	"TestToHTML/spec0.29/40":  true, // indentation of heading
+	"TestToHTML/spec0.29/51":  true, // newline in heading
+	"TestToHTML/spec0.29/52":  true, // newline in heading
+	"TestToHTML/spec0.29/57":  true, // setext heading
+	"TestToHTML/spec0.29/63":  true, // setext heading
+	"TestToHTML/spec0.29/65":  true, // newline in heading
+	"TestToHTML/spec0.29/171": true, // link ref def
+	"TestToHTML/spec0.29/208": true, // weird list
+	"TestToHTML/spec0.29/227": true, // weird list
+	"TestToHTML/spec0.29/241": true, // weird list
+	"TestToHTML/spec0.29/282": true, // weird list
+	"TestToHTML/spec0.29/283": true, // weird list
+	"TestToHTML/spec0.29/312": true, // escape plain
+	"TestToHTML/spec0.29/323": true, // escape plain
+	"TestToHTML/spec0.29/324": true, // escape plain
+	"TestToHTML/spec0.29/325": true, // escape plain
+	"TestToHTML/spec0.29/326": true, // escape plain
+	"TestToHTML/spec0.29/327": true, // escape plain
+	"TestToHTML/spec0.29/331": true, // backtick spaces
+	"TestToHTML/spec0.29/349": true, // backticks
+	"TestToHTML/spec0.29/502": true, // escape quotes
+
+	"TestToHTML/spec0.30/26":  true, // escape plain
+	"TestToHTML/spec0.30/37":  true, // escape plain
+	"TestToHTML/spec0.30/38":  true, // escape plain
+	"TestToHTML/spec0.30/39":  true, // escape plain
+	"TestToHTML/spec0.30/40":  true, // escape plain
+	"TestToHTML/spec0.30/41":  true, // escape plain
+	"TestToHTML/spec0.30/49":  true, // thematic break
+	"TestToHTML/spec0.30/70":  true, // indentation of heading
+	"TestToHTML/spec0.30/81":  true, // newline in heading
+	"TestToHTML/spec0.30/82":  true, // newline in heading
+	"TestToHTML/spec0.30/87":  true, // setext heading
+	"TestToHTML/spec0.30/93":  true, // setext heading
+	"TestToHTML/spec0.30/95":  true, // newline in heading
+	"TestToHTML/spec0.30/202": true, // link ref def
+	"TestToHTML/spec0.30/238": true, // weird list
+	"TestToHTML/spec0.30/257": true, // weird list
+	"TestToHTML/spec0.30/271": true, // weird list
+	"TestToHTML/spec0.30/312": true, // weird list
+	"TestToHTML/spec0.30/313": true, // weird list
+	"TestToHTML/spec0.30/331": true, // backtick spaces
+	"TestToHTML/spec0.30/349": true, // backticks
+	"TestToHTML/spec0.30/505": true, // escape quotes
+
+	"TestToHTML/spec0.31.2/26":  true, // escape plain
+	"TestToHTML/spec0.31.2/37":  true, // escape plain
+	"TestToHTML/spec0.31.2/38":  true, // escape plain
+	"TestToHTML/spec0.31.2/39":  true, // escape plain
+	"TestToHTML/spec0.31.2/40":  true, // escape plain
+	"TestToHTML/spec0.31.2/41":  true, // escape plain
+	"TestToHTML/spec0.31.2/49":  true, // thematic break
+	"TestToHTML/spec0.31.2/70":  true, // indentation of heading
+	"TestToHTML/spec0.31.2/81":  true, // newline in heading
+	"TestToHTML/spec0.31.2/82":  true, // newline in heading
+	"TestToHTML/spec0.31.2/87":  true, // setext heading
+	"TestToHTML/spec0.31.2/93":  true, // setext heading
+	"TestToHTML/spec0.31.2/95":  true, // newline in heading
+	"TestToHTML/spec0.31.2/202": true, // link ref def
+	"TestToHTML/spec0.31.2/238": true, // weird list
+	"TestToHTML/spec0.31.2/257": true, // weird list
+	"TestToHTML/spec0.31.2/271": true, // weird list
+	"TestToHTML/spec0.31.2/312": true, // weird list
+	"TestToHTML/spec0.31.2/313": true, // weird list
+	"TestToHTML/spec0.31.2/331": true, // backtick spaces
+	"TestToHTML/spec0.31.2/349": true, // backticks
+	"TestToHTML/spec0.31.2/506": true, // escape quotes
+
+	"TestToHTML/table/gfm200": true, // table
+	"TestToHTML/table/2":      true, // table
+}
+
 func TestToHTML(t *testing.T) {
 	files, err := filepath.Glob("testdata/*.txt")
 	if err != nil {
@@ -70,6 +152,18 @@ func TestToHTML(t *testing.T) {
 					// Make sure unexported types like emphPlain don't leak into result.
 					if x, ok := findUnexported(reflect.ValueOf(doc)); ok {
 						t.Fatalf("input %q\nparse:\n%s\nfound parsed value of unexported type %s", md.Data, dump(doc), x.Type())
+					}
+
+					// Make sure Format preserves the HTML.
+					md1 := Format(doc)
+					doc1 := p.Parse(md1)
+					h1 := encode(ToHTML(doc1))
+					if h1 != string(html.Data) && !roundTripFailures[t.Name()] {
+						q := strings.ReplaceAll(url.QueryEscape(decode(string(md.Data))), "+", "%20")
+						t.Fatalf("input %q\nreformat %q\n%s\n%s\nhave %q\nwant %q\ndingus: (https://spec.commonmark.org/dingus/?text=%s)\ngithub: (https://github.com/rsc/tmp/issues/new?body=%s)", md.Data, md1, dump(doc), dump(doc1), h1, html.Data, q, q)
+					}
+					if h1 == string(html.Data) && roundTripFailures[t.Name()] {
+						t.Fatalf("no longer failing")
 					}
 
 					npass++
@@ -230,7 +324,7 @@ func TestFormat(t *testing.T) {
 				t.Errorf("have:\n%s\nwant:\n%s", h, w)
 				outfile := file + ".have"
 				t.Logf("writing have to %s", outfile)
-				if err := os.WriteFile(outfile, []byte(h), 0400); err != nil {
+				if err := os.WriteFile(outfile, []byte(h), 0666); err != nil {
 					t.Fatal(err)
 				}
 			}

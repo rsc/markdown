@@ -68,7 +68,7 @@ each completed one invokes emphasis on inner text and then on the overall list.
 type Inline interface {
 	PrintHTML(*bytes.Buffer)
 	PrintText(*bytes.Buffer)
-	printMarkdown(*bytes.Buffer)
+	printMarkdown(*markOut)
 }
 
 type Plain struct {
@@ -81,12 +81,18 @@ func (x *Plain) PrintHTML(buf *bytes.Buffer) {
 	htmlEscaper.WriteString(buf, x.Text)
 }
 
-func (x *Plain) printMarkdown(buf *bytes.Buffer) {
+func (x *Plain) printMarkdown(buf *markOut) {
 	// TODO: This is wrong if Plain contains characters that should be escaped.
 	// Today that doesn't happen for our own parses, but constructed syntax trees
 	// might contain them.
 	// Deciding exactly what to escape is (or probably should be) somewhat context dependent.
-	buf.WriteString(x.Text)
+	for i, line := range strings.Split(x.Text, "\n") {
+		if i > 0 {
+			buf.NL()
+		}
+		buf.WriteString(line)
+		buf.noTrim()
+	}
 }
 
 func (x *Plain) PrintText(buf *bytes.Buffer) {
@@ -110,7 +116,7 @@ type Escaped struct {
 	Plain
 }
 
-func (x *Escaped) printMarkdown(buf *bytes.Buffer) {
+func (x *Escaped) printMarkdown(buf *markOut) {
 	buf.WriteByte('\\')
 	x.Plain.printMarkdown(buf)
 }
@@ -125,7 +131,7 @@ func (x *Code) PrintHTML(buf *bytes.Buffer) {
 	fmt.Fprintf(buf, "<code>%s</code>", htmlEscaper.Replace(x.Text))
 }
 
-func (x *Code) printMarkdown(buf *bytes.Buffer) {
+func (x *Code) printMarkdown(buf *markOut) {
 	// Use the fewest backticks we can, and add spaces as needed.
 	ticks := strings.Repeat("`", longestSequence(x.Text, '`')+1)
 	buf.WriteString(ticks)
@@ -184,7 +190,7 @@ func (x *Strong) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("</strong>")
 }
 
-func (x *Strong) printMarkdown(buf *bytes.Buffer) {
+func (x *Strong) printMarkdown(buf *markOut) {
 	buf.WriteString(x.Marker)
 	for _, c := range x.Inner {
 		c.printMarkdown(buf)
@@ -215,7 +221,7 @@ func (x *Del) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("</del>")
 }
 
-func (x *Del) printMarkdown(buf *bytes.Buffer) {
+func (x *Del) printMarkdown(buf *markOut) {
 	buf.WriteString(x.Marker)
 	for _, c := range x.Inner {
 		c.printMarkdown(buf)
@@ -244,7 +250,7 @@ func (x *Emph) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("</em>")
 }
 
-func (x *Emph) printMarkdown(buf *bytes.Buffer) {
+func (x *Emph) printMarkdown(buf *markOut) {
 	buf.WriteString(x.Marker)
 	for _, c := range x.Inner {
 		c.printMarkdown(buf)
@@ -491,6 +497,24 @@ func mdUnescape(s string) string {
 	}
 	return mdUnescaper.Replace(s)
 }
+
+var mdEscaper = strings.NewReplacer(
+	`(`, `\(`,
+	`)`, `\)`,
+	`[`, `\[`,
+	`]`, `\]`,
+	`*`, `\*`,
+	`_`, `\_`,
+	`<`, `\<`,
+	`>`, `\>`,
+)
+
+var mdLinkEscaper = strings.NewReplacer(
+	`(`, `\(`,
+	`)`, `\)`,
+	`<`, `\<`,
+	`>`, `\>`,
+)
 
 var mdUnescaper = func() *strings.Replacer {
 	var list = []string{
@@ -951,7 +975,7 @@ func (x *Emoji) PrintHTML(buf *bytes.Buffer) {
 	htmlEscaper.WriteString(buf, x.Text)
 }
 
-func (x *Emoji) printMarkdown(buf *bytes.Buffer) {
+func (x *Emoji) printMarkdown(buf *markOut) {
 	buf.WriteString(x.Text)
 }
 

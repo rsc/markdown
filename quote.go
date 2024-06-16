@@ -21,8 +21,10 @@ func (b *Quote) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString("</blockquote>\n")
 }
 
-func (b *Quote) printMarkdown(buf *bytes.Buffer, s mdState) {
-	s.prefix += "> "
+func (b *Quote) printMarkdown(buf *markOut, s mdState) {
+	buf.maybeQuoteNL('>')
+	buf.WriteString("> ")
+	defer buf.pop(buf.push("> "))
 	printMarkdownBlocks(b.Blocks, buf, s)
 }
 

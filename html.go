@@ -23,13 +23,15 @@ func (b *HTMLBlock) PrintHTML(buf *bytes.Buffer) {
 	}
 }
 
-func (b *HTMLBlock) printMarkdown(buf *bytes.Buffer, s mdState) {
-	if s.prefix1 != "" {
-		buf.WriteString(s.prefix1)
-	} else {
-		buf.WriteString(s.prefix)
+func (b *HTMLBlock) printMarkdown(buf *markOut, s mdState) {
+	buf.maybeNL()
+	for i, line := range b.Text {
+		if i > 0 {
+			buf.NL()
+		}
+		buf.WriteString(line)
+		buf.noTrim()
 	}
-	b.PrintHTML(buf)
 }
 
 type htmlBuilder struct {
@@ -504,8 +506,14 @@ func (x *HTMLTag) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString(x.Text)
 }
 
-func (x *HTMLTag) printMarkdown(buf *bytes.Buffer) {
-	x.PrintHTML(buf)
+func (x *HTMLTag) printMarkdown(buf *markOut) {
+	for i, line := range strings.Split(x.Text, "\n") {
+		if i > 0 {
+			buf.NL()
+		}
+		buf.WriteString(line)
+		buf.noTrim()
+	}
 }
 
 func (x *HTMLTag) PrintText(buf *bytes.Buffer) {}

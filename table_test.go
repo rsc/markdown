@@ -5,7 +5,6 @@
 package markdown
 
 import (
-	"bytes"
 	"testing"
 )
 
@@ -82,7 +81,7 @@ func TestPad(t *testing.T) {
 		a := tc.align
 		w := tc.w
 		want := tc.want
-		var buf bytes.Buffer
+		var buf markOut
 		pad(&buf, in, a, w)
 		h := buf.String()
 		if h != want {

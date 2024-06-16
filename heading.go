@@ -29,21 +29,17 @@ func (b *Heading) PrintHTML(buf *bytes.Buffer) {
 	fmt.Fprintf(buf, "</h%d>\n", b.Level)
 }
 
-func (b *Heading) printMarkdown(buf *bytes.Buffer, s mdState) {
+func (b *Heading) printMarkdown(buf *markOut, s mdState) {
+	buf.maybeNL()
+
 	// TODO: handle setext headings properly.
-	buf.WriteString(s.prefix)
 	for i := 0; i < b.Level; i++ {
 		buf.WriteByte('#')
 	}
 	buf.WriteByte(' ')
-	// The prefix has already been printed for this line of text.
-	s.prefix = ""
 	b.Text.printMarkdown(buf, s)
 	if b.ID != "" {
-		// A heading text is a block, so it ends in a newline. Move the newline
-		// after the ID.
-		buf.Truncate(buf.Len() - 1)
-		fmt.Fprintf(buf, " {#%s}\n", b.ID)
+		fmt.Fprintf(buf, " {#%s}", b.ID)
 	}
 }
 

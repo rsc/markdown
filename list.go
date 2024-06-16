@@ -7,7 +7,6 @@ package markdown
 import (
 	"bytes"
 	"fmt"
-	"strings"
 )
 
 type List struct {
@@ -43,27 +42,45 @@ func (b *List) PrintHTML(buf *bytes.Buffer) {
 	}
 }
 
-func (b *List) printMarkdown(buf *bytes.Buffer, s mdState) {
+func (b *List) printMarkdown(buf *markOut, s mdState) {
+	buf.maybeNL()
 	s.bullet = b.Bullet
 	s.num = b.Start
+	if b.Loose {
+		buf.loose++
+	} else {
+		buf.tight++
+	}
 	for i, item := range b.Items {
-		if i > 0 && b.Loose {
-			buf.WriteByte('\n')
+		if i > 0 {
+			buf.NL()
+			if b.Loose {
+				buf.NL()
+			}
 		}
 		item.printMarkdown(buf, s)
 		s.num++
 	}
+	if b.Loose {
+		buf.loose--
+	} else {
+		buf.tight--
+	}
 }
 
-func (b *Item) printMarkdown(buf *bytes.Buffer, s mdState) {
+func (b *Item) printMarkdown(buf *markOut, s mdState) {
 	var marker string
 	if s.bullet == '.' || s.bullet == ')' {
 		marker = fmt.Sprintf(" %d%c ", s.num, s.bullet)
 	} else {
 		marker = fmt.Sprintf("  %c ", s.bullet)
 	}
-	s.prefix1 = s.prefix + marker
-	s.prefix += strings.Repeat(" ", len(marker))
+	buf.WriteString(marker)
+	n := len(marker)
+	if n > 4 {
+		n = 4
+	}
+	defer buf.pop(buf.push("    "[:n]))
 	printMarkdownBlocks(b.Blocks, buf, s)
 }
 
@@ -321,8 +338,16 @@ func (x *Task) PrintHTML(buf *bytes.Buffer) {
 	buf.WriteString(`disabled="" type="checkbox"> `)
 }
 
-func (x *Task) printMarkdown(buf *bytes.Buffer) {
-	x.PrintText(buf)
+func (x *Task) printMarkdown(buf *markOut) {
+	// TODO share with printText
+	buf.WriteByte('[')
+	if x.Checked {
+		buf.WriteByte('x')
+	} else {
+		buf.WriteByte(' ')
+	}
+	buf.WriteByte(']')
+	buf.WriteByte(' ')
 }
 
 func (x *Task) PrintText(buf *bytes.Buffer) {

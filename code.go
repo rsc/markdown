@@ -56,37 +56,34 @@ func (b *CodeBlock) PrintHTML(buf *bytes.Buffer) {
 // 	return len(s)
 // }
 
-func (b *CodeBlock) printMarkdown(buf *bytes.Buffer, s mdState) {
-	prefix1 := s.prefix1
-	if prefix1 == "" {
-		prefix1 = s.prefix
-	}
+func (b *CodeBlock) printMarkdown(buf *markOut, s mdState) {
 	if b.Fence == "" {
+		buf.maybeNL()
 		for i, line := range b.Text {
-			// Ignore final empty line (why is it even there?).
+			// TODO Ignore final empty line (why is it even there?).
 			if i == len(b.Text)-1 && len(line) == 0 {
 				break
 			}
-			// var iline string
-			// is := initialSpaces(line)
-			// if is < 4 {
-			// 	iline = "    " + line
-			// } else {
-			// 	iline = "\t" + line[4:]
-			// }
-			// Indent by 4 spaces.
-			pre := s.prefix
-			if i == 0 {
-				pre = prefix1
+			if i > 0 {
+				buf.NL()
 			}
-			fmt.Fprintf(buf, "%s%s%s\n", pre, "    ", line)
+			buf.WriteString("    ")
+			buf.WriteString(line)
+			buf.noTrim()
 		}
 	} else {
-		fmt.Fprintf(buf, "%s%s%s\n", prefix1, b.Fence, b.Info)
-		for _, line := range b.Text {
-			fmt.Fprintf(buf, "%s%s\n", s.prefix, line)
+		if buf.tight == 0 {
+			buf.maybeNL()
 		}
-		fmt.Fprintf(buf, "%s%s\n", s.prefix, b.Fence)
+		buf.WriteString(b.Fence)
+		buf.WriteString(b.Info)
+		for _, line := range b.Text {
+			buf.NL()
+			buf.WriteString(line)
+			buf.noTrim()
+		}
+		buf.NL()
+		buf.WriteString(b.Fence)
 	}
 }
 
