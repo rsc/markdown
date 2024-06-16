@@ -584,6 +584,7 @@ Restart:
 
 func (p *parseState) parseAutoProto(s string, i int, vd *validDomainChecker) (link *Link, after string, found bool) {
 	if s == "" {
+		// unreachable unless called wrong
 		return
 	}
 	switch s[i] {
@@ -609,7 +610,7 @@ func (p *parseState) parseAutoProto(s string, i int, vd *validDomainChecker) (li
 		if p.AutoLinkAssumeHTTP {
 			scheme = "http://"
 		}
-		return p.parseAutoHTTP(scheme, s, i, i, i+3, vd)
+		return p.parseAutoHTTP(scheme, s, i, i, i+4, vd)
 	case 'm':
 		if !strings.HasPrefix(s[i:], "mailto:") {
 			return
@@ -621,6 +622,7 @@ func (p *parseState) parseAutoProto(s string, i int, vd *validDomainChecker) (li
 		}
 		return p.parseAutoXmpp(s, i)
 	}
+	// unreachable unless called wrong
 	return
 }
 
@@ -652,7 +654,7 @@ func (p *parseState) parseAutoHTTP(scheme, s string, textstart, start, min int, 
 
 	// https://github.github.com/gfm/#extended-autolink-path-validation
 Trim:
-	for i > min {
+	for i > 0 {
 		switch s[i-1] {
 		case '?', '!', '.', ',', ':', '@', '_', '~':
 			// Trim certain trailing punctuation.
@@ -683,9 +685,12 @@ Trim:
 					continue Trim
 				}
 				if !isLetterDigit(s[j]) {
+					i--
 					break Trim
 				}
 			}
+			// unreachable since there is a dot in the domain,
+			// which will hit !isLetterDigit above.
 		}
 		break Trim
 	}
@@ -769,6 +774,7 @@ func (v *validDomainChecker) parseValidDomain(start int) (n int, found bool) {
 
 func (p *parseState) parseAutoEmail(s string, i int) (before string, link *Link, after string, ok bool) {
 	if s[i] != '@' {
+		// unreachable unless called wrong
 		return
 	}
 

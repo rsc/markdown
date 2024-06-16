@@ -62,3 +62,42 @@ Others by hand, guessing based on GitHub behavior.
 <li><input checked="" disabled="" type="checkbox"> bar</li>
 <li><input disabled="" type="checkbox"> baz</li>
 </ul>
+-- 1.md --
+- [x] foo
+-
+- [x] bar
+- hello
+- > quote
+- *emph*
+-- 1.html --
+<ul>
+<li><input checked="" disabled="" type="checkbox"> foo</li>
+<li></li>
+<li><input checked="" disabled="" type="checkbox"> bar</li>
+<li>hello</li>
+<li>
+<blockquote>
+<p>quote</p>
+</blockquote>
+</li>
+<li><em>emph</em></li>
+</ul>
+-- 2.md --
+- [x] foo
+-
+- [x] bar
+
+- hello
+-- 2.html --
+<ul>
+<li>
+<p><input checked="" disabled="" type="checkbox"> foo</p>
+</li>
+<li></li>
+<li>
+<p><input checked="" disabled="" type="checkbox"> bar</p>
+</li>
+<li>
+<p>hello</p>
+</li>
+</ul>

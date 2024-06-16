@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"go/token"
 	"io"
 	"net/url"
@@ -66,9 +67,11 @@ func TestToHTML(t *testing.T) {
 						t.Fatalf("input %q\nparse:\n%s\nhave %q\nwant %q\ndingus: (https://spec.commonmark.org/dingus/?text=%s)\ngithub: (https://github.com/rsc/tmp/issues/new?body=%s)", md.Data, dump(doc), h, html.Data, q, q)
 					}
 
+					// Make sure unexported types like emphPlain don't leak into result.
 					if x, ok := findUnexported(reflect.ValueOf(doc)); ok {
 						t.Fatalf("input %q\nparse:\n%s\nfound parsed value of unexported type %s", md.Data, dump(doc), x.Type())
 					}
+
 					npass++
 				})
 
@@ -235,6 +238,24 @@ func TestFormat(t *testing.T) {
 	}
 }
 
+func TestInline(t *testing.T) {
+	// Test that these don't crash,
+	// and also "cover" the bodies.
+	new(HardBreak).Inline()
+	new(SoftBreak).Inline()
+	new(HTMLTag).Inline()
+	new(Plain).Inline()
+	new(Code).Inline()
+	new(Strong).Inline()
+	new(Del).Inline()
+	new(Emph).Inline()
+	new(Emoji).Inline()
+	new(AutoLink).Inline()
+	new(Link).Inline()
+	new(Image).Inline()
+	new(Task).Inline()
+}
+
 func findUnexported(v reflect.Value) (reflect.Value, bool) {
 	if t := v.Type(); t.PkgPath() != "" && !token.IsExported(t.Name()) {
 		return v, true
@@ -265,20 +286,94 @@ func findUnexported(v reflect.Value) (reflect.Value, bool) {
 	return v, false
 }
 
-func TestInline(t *testing.T) {
-	// Test that these don't crash,
-	// and also "cover" the bodies.
-	new(HardBreak).Inline()
-	new(SoftBreak).Inline()
-	new(HTMLTag).Inline()
-	new(Plain).Inline()
-	new(Code).Inline()
-	new(Strong).Inline()
-	new(Del).Inline()
-	new(Emph).Inline()
-	new(Emoji).Inline()
-	new(AutoLink).Inline()
-	new(Link).Inline()
-	new(Image).Inline()
-	new(Task).Inline()
+var (
+	blockType   = reflect.TypeOf(new(Block)).Elem()
+	blocksType  = reflect.TypeOf(new([]Block)).Elem()
+	inlinesType = reflect.TypeOf(new([]Inline)).Elem()
+)
+
+func printb(buf *bytes.Buffer, b Block, prefix string) {
+	fmt.Fprintf(buf, "(%T", b)
+	v := reflect.ValueOf(b)
+	v = reflect.Indirect(v)
+	if v.Kind() != reflect.Struct {
+		fmt.Fprintf(buf, " %v", b)
+	}
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		tf := t.Field(i)
+		if !tf.IsExported() {
+			continue
+		}
+		if tf.Type == inlinesType {
+			printis(buf, v.Field(i).Interface().([]Inline))
+		} else if tf.Type.Kind() == reflect.Slice && tf.Type.Elem().Kind() == reflect.String {
+			fmt.Fprintf(buf, " %s:%q", tf.Name, v.Field(i))
+		} else if tf.Type != blocksType && !tf.Type.Implements(blockType) && tf.Type.Kind() != reflect.Slice {
+			fmt.Fprintf(buf, " %s:%v", tf.Name, v.Field(i))
+		}
+	}
+
+	prefix += "\t"
+	for i := 0; i < t.NumField(); i++ {
+		tf := t.Field(i)
+		if !tf.IsExported() {
+			continue
+		}
+		if tf.Type.Implements(blockType) {
+			fmt.Fprintf(buf, "\n%s", prefix)
+			printb(buf, v.Field(i).Interface().(Block), prefix)
+		} else if tf.Type == blocksType {
+			vf := v.Field(i)
+			for i := 0; i < vf.Len(); i++ {
+				fmt.Fprintf(buf, "\n%s", prefix)
+				printb(buf, vf.Index(i).Interface().(Block), prefix)
+			}
+		} else if tf.Type.Kind() == reflect.Slice && tf.Type != inlinesType && tf.Type.Elem().Kind() != reflect.String {
+			fmt.Fprintf(buf, "\n%s%s:", prefix, t.Field(i).Name)
+			printslice(buf, v.Field(i), prefix)
+		}
+	}
+	fmt.Fprintf(buf, ")")
+}
+
+func printslice(buf *bytes.Buffer, v reflect.Value, prefix string) {
+	if v.Type().Elem().Kind() == reflect.Slice {
+		for i := 0; i < v.Len(); i++ {
+			fmt.Fprintf(buf, "\n%s#%d:", prefix, i)
+			printslice(buf, v.Index(i), prefix+"\t")
+		}
+		return
+	}
+	for i := 0; i < v.Len(); i++ {
+		fmt.Fprintf(buf, " ")
+		printb(buf, v.Index(i).Interface().(Block), prefix+"\t")
+	}
+}
+
+func printi(buf *bytes.Buffer, in Inline) {
+	fmt.Fprintf(buf, "%T(", in)
+	v := reflect.ValueOf(in).Elem()
+	text := v.FieldByName("Text")
+	if text.IsValid() {
+		fmt.Fprintf(buf, "%q", text)
+	}
+	inner := v.FieldByName("Inner")
+	if inner.IsValid() {
+		printis(buf, inner.Interface().([]Inline))
+	}
+	buf.WriteString(")")
+}
+
+func printis(buf *bytes.Buffer, ins []Inline) {
+	for _, in := range ins {
+		buf.WriteByte(' ')
+		printi(buf, in)
+	}
+}
+
+func dump(b Block) string {
+	var buf bytes.Buffer
+	printb(&buf, b, "")
+	return buf.String()
 }

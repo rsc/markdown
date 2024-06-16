@@ -232,9 +232,71 @@ The end.
 `` \[\` ``
 -- parser.json --
 {"Strikethrough": true}
--- strike --
+-- strike1 --
 hello ~~world~~
 -- parser.json --
 {"Strikethrough": false}
--- strike --
+-- strike2 --
 hello ~~world~~
+-- parser.json --
+{"Emoji": true}
+-- fire1 --
+hello :fire:
+
+![:fire:](fire.jpg)
+-- want --
+hello 🔥
+
+![🔥](fire.jpg)
+-- parser.json --
+{"Emoji": false}
+-- fire2 --
+hello :fire:
+-- tabspace --
+>	tab
+> 	space tab
+>  	space space tab
+>   	space space space tab
+
+- list
+ space
+ 	space tab
+	tab
+
+ - list
+ space
+ 	space tab
+	tab
+
+  - list
+ space
+ 	space tab
+	tab
+
+- list
+  - sublist
+	tab
+-- want --
+> tab
+> space tab
+> space space tab
+> space space space tab
+
+  - list
+    space
+    space tab
+    tab
+
+  - list
+    space
+    space tab
+    tab
+
+  - list
+    space
+    space tab
+    tab
+
+  - list
+      - sublist
+        tab

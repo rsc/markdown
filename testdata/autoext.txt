@@ -213,7 +213,7 @@ www.search
 -- 21.md --
 www.
 -- 21.html --
-<p><a href="http://www">www</a>.</p>
+<p>www.</p>
 -- 21a.md --
 www.!search
 -- 21a.html --
@@ -326,3 +326,43 @@ https://web.site:8080/~matloob
 https://web.site:8080/*matlo_ob
 -- 47.html --
 <p><a href="https://web.site:8080/*matlo_ob">https://web.site:8080/*matlo_ob</a></p>
+-- parser.json --
+{"AutoLinkText": true, "Strikethrough": true}
+-- 48.md --
+*user@dom.org*
+-- 48.html --
+<p><em><a href="mailto:user@dom.org">user@dom.org</a></em></p>
+-- 49.md --
+**user@dom.org**
+-- 49.html --
+<p><strong><a href="mailto:user@dom.org">user@dom.org</a></strong></p>
+-- 50.md --
+~~user@dom.org~~
+-- 50.html --
+<p><del><a href="mailto:user@dom.org">user@dom.org</a></del></p>
+-- 51.md --
+www.google.com/search?q=cmark&-hl;
+-- 51.html --
+<p><a href="https://www.google.com/search?q=cmark&amp;-hl">www.google.com/search?q=cmark&amp;-hl</a>;</p>
+-- 52.md --
+foo@.bar
+-- 52.html --
+<p><a href="mailto:foo@.bar">foo@.bar</a></p>
+-- 53.md --
+foo@..bar
+-- 53.html --
+<p>foo@..bar</p>
+-- 54.md --
+mailto:none
+mailto:none#
+-- 54.html --
+<p>mailto:none
+mailto:none#</p>
+-- 55.md --
+xmpp:none
+xmpp:none#
+xmpp:foo@..bar
+-- 55.html --
+<p>xmpp:none
+xmpp:none#
+xmpp:foo@..bar</p>

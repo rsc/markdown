@@ -7,7 +7,6 @@ package markdown
 import (
 	"bytes"
 	"fmt"
-	"reflect"
 	"slices"
 	"strings"
 )
@@ -298,6 +297,7 @@ func (p *parseState) nextB() blockBuilder {
 }
 func (p *parseState) trimStack(depth int) {
 	if len(p.stack) < depth {
+		// unreachable
 		panic("trimStack")
 	}
 	for len(p.stack) > depth {
@@ -407,6 +407,7 @@ Prefixes:
 }
 
 func (c *rootBuilder) extend(p *parseState, s line) (line, bool) {
+	// unreachable
 	panic("root extend")
 }
 
@@ -495,6 +496,7 @@ func (s *line) string() string {
 	case 3:
 		return "   " + s.text[s.i:]
 	}
+	// unreachable
 	panic("bad spaces")
 }
 
@@ -622,96 +624,4 @@ func printMarkdownBlocks(bs []Block, buf *bytes.Buffer, s mdState) {
 		prevEnd = b.Pos().EndLine
 		s.prefix1 = "" // item prefix only for first block
 	}
-}
-
-var (
-	blockType   = reflect.TypeOf(new(Block)).Elem()
-	blocksType  = reflect.TypeOf(new([]Block)).Elem()
-	inlinesType = reflect.TypeOf(new([]Inline)).Elem()
-)
-
-func printb(buf *bytes.Buffer, b Block, prefix string) {
-	fmt.Fprintf(buf, "(%T", b)
-	v := reflect.ValueOf(b)
-	v = reflect.Indirect(v)
-	if v.Kind() != reflect.Struct {
-		fmt.Fprintf(buf, " %v", b)
-	}
-	t := v.Type()
-	for i := 0; i < t.NumField(); i++ {
-		tf := t.Field(i)
-		if !tf.IsExported() {
-			continue
-		}
-		if tf.Type == inlinesType {
-			printis(buf, v.Field(i).Interface().([]Inline))
-		} else if tf.Type.Kind() == reflect.Slice && tf.Type.Elem().Kind() == reflect.String {
-			fmt.Fprintf(buf, " %s:%q", tf.Name, v.Field(i))
-		} else if tf.Type != blocksType && !tf.Type.Implements(blockType) && tf.Type.Kind() != reflect.Slice {
-			fmt.Fprintf(buf, " %s:%v", tf.Name, v.Field(i))
-		}
-	}
-
-	prefix += "\t"
-	for i := 0; i < t.NumField(); i++ {
-		tf := t.Field(i)
-		if !tf.IsExported() {
-			continue
-		}
-		if tf.Type.Implements(blockType) {
-			fmt.Fprintf(buf, "\n%s", prefix)
-			printb(buf, v.Field(i).Interface().(Block), prefix)
-		} else if tf.Type == blocksType {
-			vf := v.Field(i)
-			for i := 0; i < vf.Len(); i++ {
-				fmt.Fprintf(buf, "\n%s", prefix)
-				printb(buf, vf.Index(i).Interface().(Block), prefix)
-			}
-		} else if tf.Type.Kind() == reflect.Slice && tf.Type != inlinesType && tf.Type.Elem().Kind() != reflect.String {
-			fmt.Fprintf(buf, "\n%s%s:", prefix, t.Field(i).Name)
-			printslice(buf, v.Field(i), prefix)
-		}
-	}
-	fmt.Fprintf(buf, ")")
-}
-
-func printslice(buf *bytes.Buffer, v reflect.Value, prefix string) {
-	if v.Type().Elem().Kind() == reflect.Slice {
-		for i := 0; i < v.Len(); i++ {
-			fmt.Fprintf(buf, "\n%s#%d:", prefix, i)
-			printslice(buf, v.Index(i), prefix+"\t")
-		}
-		return
-	}
-	for i := 0; i < v.Len(); i++ {
-		fmt.Fprintf(buf, " ")
-		printb(buf, v.Index(i).Interface().(Block), prefix+"\t")
-	}
-}
-
-func printi(buf *bytes.Buffer, in Inline) {
-	fmt.Fprintf(buf, "%T(", in)
-	v := reflect.ValueOf(in).Elem()
-	text := v.FieldByName("Text")
-	if text.IsValid() {
-		fmt.Fprintf(buf, "%q", text)
-	}
-	inner := v.FieldByName("Inner")
-	if inner.IsValid() {
-		printis(buf, inner.Interface().([]Inline))
-	}
-	buf.WriteString(")")
-}
-
-func printis(buf *bytes.Buffer, ins []Inline) {
-	for _, in := range ins {
-		buf.WriteByte(' ')
-		printi(buf, in)
-	}
-}
-
-func dump(b Block) string {
-	var buf bytes.Buffer
-	printb(&buf, b, "")
-	return buf.String()
 }

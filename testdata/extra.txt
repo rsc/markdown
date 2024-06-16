@@ -1258,3 +1258,57 @@ hello "the" world
 hello "the" world
 -- 165.html --
 <p>hello &quot;the&quot; world</p>
+-- parser.json --
+{"Emoji": true}
+-- 166.md --
+hello :fire: :nope: :world
+
+hello :world :nope: :fire:
+
+hello :world :fire: :nope:
+
+![:fire:](fire.jpg)
+-- 166.html --
+<p>hello 🔥 :nope: :world</p>
+<p>hello :world :nope: 🔥</p>
+<p>hello :world 🔥 :nope:</p>
+<p><img src="fire.jpg" alt="🔥" /></p>
+-- parser.json --
+{"Emoji": false}
+-- 167.md --
+hello :fire: :nope: :world
+
+hello :world :nope: :fire:
+
+hello :world :fire: :nope:
+
+![:fire:](fire.jpg)
+-- 167.html --
+<p>hello :fire: :nope: :world</p>
+<p>hello :world :nope: :fire:</p>
+<p>hello :world :fire: :nope:</p>
+<p><img src="fire.jpg" alt=":fire:" /></p>
+-- 168.md --
+<user@
+-- 168.html --
+<p>&lt;user@</p>
+-- 169.md --
+<user@abcα>
+-- 169.html --
+<p>&lt;user@abcα&gt;</p>
+-- 170.md --
+<user@abc->
+-- 170.html --
+<p>&lt;user@abc-&gt;</p>
+-- 171.md --
+<user@012345678901234567890123456789012345678901234567890123456789012>
+-- 171.html --
+<p><a href="mailto:user@012345678901234567890123456789012345678901234567890123456789012">user@012345678901234567890123456789012345678901234567890123456789012</a></p>
+-- 172.md --
+<user@0123456789012345678901234567890123456789012345678901234567890123>
+-- 172.html --
+<p>&lt;user@0123456789012345678901234567890123456789012345678901234567890123&gt;</p>
+-- 173.md --
+![<user@dom>](file.jpg)
+-- 173.html --
+<p><img src="file.jpg" alt="user@dom" /></p>

@@ -44,9 +44,6 @@ func (b *List) PrintHTML(buf *bytes.Buffer) {
 }
 
 func (b *List) printMarkdown(buf *bytes.Buffer, s mdState) {
-	if buf.Len() > 0 && buf.Bytes()[buf.Len()-1] != '\n' {
-		buf.WriteByte('\n')
-	}
 	s.bullet = b.Bullet
 	s.num = b.Start
 	for i, item := range b.Items {
@@ -289,6 +286,7 @@ func (p *parseState) taskList(list *List) {
 			text = b
 		}
 		if len(text.Inline) < 1 {
+			// unreachable with standard parser
 			continue
 		}
 		pl, ok := text.Inline[0].(*Plain)
@@ -304,15 +302,8 @@ func (p *parseState) taskList(list *List) {
 			continue
 		}
 		text.Inline = append([]Inline{&Task{Checked: s[1] == 'x' || s[1] == 'X'},
-			&Plain{Text: s[len("[x]"):]}}, text.Inline[1:]...)
+			&Plain{Text: s[len("[x] "):]}}, text.Inline[1:]...)
 	}
-}
-
-func ins(first Inline, x []Inline) []Inline {
-	x = append(x, nil)
-	copy(x[1:], x)
-	x[0] = first
-	return x
 }
 
 type Task struct {
@@ -327,7 +318,7 @@ func (x *Task) PrintHTML(buf *bytes.Buffer) {
 	if x.Checked {
 		buf.WriteString(`checked="" `)
 	}
-	buf.WriteString(`disabled="" type="checkbox">`)
+	buf.WriteString(`disabled="" type="checkbox"> `)
 }
 
 func (x *Task) printMarkdown(buf *bytes.Buffer) {

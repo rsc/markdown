@@ -1,0 +1,5 @@
+-- parser.json --
+{"TaskListItems": true}
+-- gfm279.md --
+  - [ ] foo
+  - [x] bar

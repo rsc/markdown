@@ -82,6 +82,10 @@ func (x *Plain) PrintHTML(buf *bytes.Buffer) {
 }
 
 func (x *Plain) printMarkdown(buf *bytes.Buffer) {
+	// TODO: This is wrong if Plain contains characters that should be escaped.
+	// Today that doesn't happen for our own parses, but constructed syntax trees
+	// might contain them.
+	// Deciding exactly what to escape is (or probably should be) somewhat context dependent.
 	buf.WriteString(x.Text)
 }
 
