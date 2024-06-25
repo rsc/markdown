@@ -1312,3 +1312,11 @@ hello :world :fire: :nope:
 ![<user@dom>](file.jpg)
 -- 173.html --
 <p><img src="file.jpg" alt="user@dom" /></p>
+-- 174.md --
+Line break before indented code: \
+
+	hello world
+-- 174.html --
+<p>Line break before indented code: \</p>
+<pre><code>hello world
+</code></pre>

@@ -54,7 +54,7 @@ func newATXHeading(p *parseState, s line) (line, bool) {
 			s = t
 		}
 		var id string
-		if p.HeadingIDs {
+		if p.HeadingID {
 			// Parse and remove ID attribute.
 			// It must come before trailing '#'s to more closely follow the spec:
 			//    The optional closing sequence of #s must be preceded by spaces or tabs

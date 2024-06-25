@@ -1,6 +1,6 @@
 Goldmark fails on 11 because it doesn't like slashes or spaces in ids.
 -- parser.json --
-{"HeadingIDs": true}
+{"HeadingID": true}
 -- 1.md --
 # Heading
 -- 1.html --

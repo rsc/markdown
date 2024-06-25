@@ -207,13 +207,13 @@ func goldmarkParser(p *Parser) goldmark.Markdown {
 	opts := []goldmark.Option{
 		goldmark.WithRendererOptions(ghtml.WithUnsafe()),
 	}
-	if p.HeadingIDs {
+	if p.HeadingID {
 		opts = append(opts, goldmark.WithParserOptions(gparser.WithHeadingAttribute()))
 	}
 	if p.Strikethrough {
 		opts = append(opts, goldmark.WithExtensions(gext.Strikethrough))
 	}
-	if p.TaskListItems {
+	if p.TaskList {
 		opts = append(opts, goldmark.WithExtensions(gext.TaskList))
 	}
 	if p.AutoLinkText {

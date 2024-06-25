@@ -1,5 +1,5 @@
 -- parser.json --
-{"HeadingIDs": true}
+{"HeadingID": true}
 -- 1 --
 #  H  {# id }
 -- want --

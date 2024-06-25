@@ -6,7 +6,7 @@ gfm* from https://github.github.com/gfm/#task-list-items-extension-
 Others by hand, guessing based on GitHub behavior.
 
 -- parser.json --
-{"TaskListItems": true}
+{"TaskList": true}
 -- gfm279.md --
 - [ ] foo
 - [x] bar

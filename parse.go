@@ -234,24 +234,24 @@ type Document struct {
 // [Parser.Parse] in order to customize the details of the parsing process.
 // A Parser is safe for concurrent use by multiple goroutines.
 type Parser struct {
-	// HeadingIDs determines whether the parser accepts
+	// HeadingID determines whether the parser accepts
 	// the {#hdr} syntax for an HTML id="hdr" attribute on headings.
 	// For example, if HeadingIDs is true then the Markdown
 	//    ## Overview {#overview}
 	// will render as the HTML
 	//    <h2 id="overview">Overview</h2>
-	HeadingIDs bool
+	HeadingID bool
 
 	// Strikethrough determines whether the parser accepts
 	// ~abc~ and ~~abc~~ as strikethrough syntax, producing
 	// <del>abc</del> in HTML.
 	Strikethrough bool
 
-	// TaskListItems determines whether the parser accepts
+	// TaskList determines whether the parser accepts
 	// “task list items” as defined in GitHub Flavored Markdown.
 	// When a list item begins with the plain text [ ] or [x]
 	// that turns into an unchecked or checked check box.
-	TaskListItems bool
+	TaskList bool
 
 	// TODO
 	AutoLinkText       bool
@@ -353,7 +353,7 @@ func (p *Parser) parse(text string) (d *Document, corner bool) {
 		t.Inline = ps.inline(t.raw)
 	}
 
-	if p.TaskListItems {
+	if p.TaskList {
 		for _, list := range ps.lists {
 			ps.taskList(list)
 		}
@@ -446,7 +446,7 @@ func (p *parseState) closeBlock() Block {
 	blk := b.builder.build(p)
 	if list, ok := blk.(*List); ok {
 		p.corner = p.corner || listCorner(list)
-		if p.TaskListItems {
+		if p.TaskList {
 			p.lists = append(p.lists, list)
 		}
 	}

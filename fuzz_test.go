@@ -62,10 +62,10 @@ func FuzzGoldmark(f *testing.F) {
 		}
 		var parsers = []Parser{
 			{},
-			{HeadingIDs: true},
+			{HeadingID: true},
 			{Strikethrough: true},
-			{TaskListItems: true},
-			{HeadingIDs: true, Strikethrough: true, TaskListItems: true},
+			{TaskList: true},
+			{HeadingID: true, Strikethrough: true, TaskList: true},
 		}
 		for i, p := range parsers {
 			if t.Failed() {
