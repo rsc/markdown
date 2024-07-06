@@ -81,9 +81,9 @@ func TestPad(t *testing.T) {
 		a := tc.align
 		w := tc.w
 		want := tc.want
-		var buf markOut
-		pad(&buf, in, a, w)
-		h := buf.String()
+		var p printer
+		pad(&p, in, a, w)
+		h := p.buf.String()
 		if h != want {
 			t.Errorf("\npad(%s, %s, %d)\n have %q\n want %q", in, a, w, h, want)
 		}

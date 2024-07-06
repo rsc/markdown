@@ -5,17 +5,173 @@
 package markdown
 
 import (
-	"bytes"
 	"strings"
 	"unicode/utf8"
 )
 
+// A Table is a [Block] representing a [table], a GitHub-flavored Markdown extension.
+//
+// [table]: https://github.github.com/gfm/#tables-extension-
+type Table struct {
+	Position
+	Header []*Text   // header row (slice of columns)
+	Align  []string  // alignment for columns: "left", "center", "right"; "" for unset
+	Rows   [][]*Text // data rows (slices of columns, not necessarily all same width)
+}
+
+func (*Table) Block() {}
+
+func (t *Table) printHTML(p *printer) {
+	p.html("<table>\n")
+	p.html("<thead>\n")
+	p.html("<tr>\n")
+	for i, hdr := range t.Header {
+		p.html("<th")
+		if t.Align[i] != "" {
+			p.html(` align="`, t.Align[i], `"`)
+		}
+		p.html(">")
+		hdr.printHTML(p)
+		p.html("</th>\n")
+	}
+	p.html("</tr>\n")
+	p.html("</thead>\n")
+	if len(t.Rows) > 0 {
+		p.html("<tbody>\n")
+		for _, row := range t.Rows {
+			p.html("<tr>\n")
+			for i, cell := range row {
+				p.html("<td")
+				if i < len(t.Align) && t.Align[i] != "" {
+					p.html(` align="`, t.Align[i], `"`)
+				}
+				p.html(">")
+				cell.printHTML(p)
+				p.html("</td>\n")
+			}
+			p.html("</tr>\n")
+		}
+		p.html("</tbody>\n")
+	}
+	p.html("</table>\n")
+}
+
+func (t *Table) printMarkdown(p *printer) {
+	// TODO: double-check this
+	// inline all Text values in Header and Rows to
+	// get final, rendered widths
+	var (
+		hdr       = make([]string, len(t.Header))
+		rows      = make([][]string, 0, len(t.Rows))
+		maxWidths = make([]int, len(t.Header))
+
+		xb = &printer{}
+		xs string
+	)
+
+	toString := func(txt *Text) string {
+		xb.buf.Reset()
+		txt.printMarkdown(xb)
+		return strings.TrimSpace(xb.buf.String())
+	}
+
+	for i, txt := range t.Header {
+		xs = toString(txt)
+		hdr[i] = xs
+		maxWidths[i] = utf8.RuneCountInString(xs)
+	}
+
+	for _, row := range t.Rows {
+		xrow := make([]string, len(hdr))
+		for j := range t.Header {
+			xs = toString(row[j])
+			xrow[j] = xs
+			if n := utf8.RuneCountInString(xs); n > maxWidths[j] {
+				maxWidths[j] = n
+			}
+		}
+		rows = append(rows, xrow)
+	}
+
+	p.maybeQuoteNL('|')
+	for i, cell := range hdr {
+		p.WriteString("| ")
+		pad(p, cell, t.Align[i], maxWidths[i])
+		p.WriteString(" ")
+	}
+	p.WriteString("|")
+
+	p.nl()
+	for i, a := range t.Align {
+		w := maxWidths[i]
+		p.WriteString("| ")
+		switch a {
+		case "left":
+			p.WriteString(":")
+			repeat(p, '-', w-1)
+		case "center":
+			p.WriteString(":")
+			repeat(p, '-', w-2)
+			p.WriteString(":")
+		case "right":
+			repeat(p, '-', w-1)
+			p.WriteString(":")
+		default:
+			repeat(p, '-', w)
+		}
+		p.WriteString(" ")
+	}
+	p.WriteString("|")
+
+	for _, row := range rows {
+		p.nl()
+		for i := range t.Header {
+			p.WriteString("| ")
+			pad(p, row[i], t.Align[i], maxWidths[i])
+			p.WriteString(" ")
+		}
+		p.WriteString("|")
+	}
+}
+
+// repeat prints c n times to p.
+func repeat(p *printer, c byte, n int) {
+	for i := 0; i < n; i++ {
+		p.WriteByte(c)
+	}
+}
+
+// pad prints text to p aligned according to align,
+// aiming for a width of w runes.
+// It can happen that multiple runes appear as a single “character”,
+// which will break the alignment, but this is the best we can do for now.
+func pad(p *printer, text, align string, w int) {
+	n := w - utf8.RuneCountInString(text)
+	switch align {
+	default:
+		p.WriteString(text)
+		repeat(p, ' ', n)
+	case "right":
+		repeat(p, ' ', n)
+		p.WriteString(text)
+	case "center":
+		repeat(p, ' ', n/2)
+		p.WriteString(text)
+		repeat(p, ' ', n-n/2)
+	}
+}
+
+// A tableTrimmed is a table row with the outer pipes (if any) removed.
+// It is a separate type to avoid accidentally trimming the outer pipes multiple times,
+// which would instead discard outer empty cells.
 type tableTrimmed string
 
+// isTableSpace reports whether c is a space as far as tables are concerned.
 func isTableSpace(c byte) bool {
 	return c == ' ' || c == '\t' || c == '\v' || c == '\f'
 }
 
+// tableTrimSpace returns s with table space prefixes and suffixes removed.
 func tableTrimSpace(s string) string {
 	i := 0
 	for i < len(s) && isTableSpace(s[i]) {
@@ -28,6 +184,7 @@ func tableTrimSpace(s string) string {
 	return s[i:j]
 }
 
+// tableTrimOuter trims the outer | |, if any, from the row.
 func tableTrimOuter(row string) tableTrimmed {
 	row = tableTrimSpace(row)
 	if len(row) > 0 && row[0] == '|' {
@@ -39,6 +196,8 @@ func tableTrimOuter(row string) tableTrimmed {
 	return tableTrimmed(row)
 }
 
+// isTableStart reports whether the pair of lines hdr1, delim1
+// are a valid table start.
 func isTableStart(hdr1, delim1 string) bool {
 	// Scan potential delimiter string, counting columns.
 	// This happens on every line of text,
@@ -74,17 +233,18 @@ func isTableStart(hdr1, delim1 string) bool {
 		}
 	}
 
-	if strings.TrimSpace(hdr1) == "|" {
+	if tableTrimSpace(hdr1) == "|" {
 		// https://github.com/github/cmark-gfm/pull/127 and
 		// https://github.com/github/cmark-gfm/pull/128
 		// fixed a buffer overread by rejecting | by itself as a table line.
-		// That seems to violate the spec, but we will play along.
+		// That seems to violate the “spec”, but we will play along.
 		return false
 	}
 
 	return col == tableCount(tableTrimOuter(hdr1))
 }
 
+// tableCount returns the number of columns in the row.
 func tableCount(row tableTrimmed) int {
 	col := 1
 	prev := byte(0)
@@ -98,167 +258,26 @@ func tableCount(row tableTrimmed) int {
 	return col
 }
 
+// A tableBuilder is a [blockBuilder] for a [Table].
 type tableBuilder struct {
-	hdr   tableTrimmed
-	delim tableTrimmed
-	rows  []tableTrimmed
+	hdr   tableTrimmed   // header line
+	delim tableTrimmed   // delimiter line
+	rows  []tableTrimmed // data lines
 }
 
+// start starts the builder with the given header and delimiter lines.
 func (b *tableBuilder) start(hdr, delim string) {
 	b.hdr = tableTrimOuter(hdr)
 	b.delim = tableTrimOuter(delim)
 }
 
+// addRow adds a new row to the table.
 func (b *tableBuilder) addRow(row string) {
 	b.rows = append(b.rows, tableTrimOuter(row))
 }
 
-type Table struct {
-	Position
-	Header []*Text
-	Align  []string // 'l', 'c', 'r' for left, center, right; 0 for unset
-	Rows   [][]*Text
-}
-
-func (t *Table) PrintHTML(buf *bytes.Buffer) {
-	buf.WriteString("<table>\n")
-	buf.WriteString("<thead>\n")
-	buf.WriteString("<tr>\n")
-	for i, hdr := range t.Header {
-		buf.WriteString("<th")
-		if t.Align[i] != "" {
-			buf.WriteString(" align=\"")
-			buf.WriteString(t.Align[i])
-			buf.WriteString("\"")
-		}
-		buf.WriteString(">")
-		hdr.PrintHTML(buf)
-		buf.WriteString("</th>\n")
-	}
-	buf.WriteString("</tr>\n")
-	buf.WriteString("</thead>\n")
-	if len(t.Rows) > 0 {
-		buf.WriteString("<tbody>\n")
-		for _, row := range t.Rows {
-			buf.WriteString("<tr>\n")
-			for i, cell := range row {
-				buf.WriteString("<td")
-				if i < len(t.Align) && t.Align[i] != "" {
-					buf.WriteString(" align=\"")
-					buf.WriteString(t.Align[i])
-					buf.WriteString("\"")
-				}
-				buf.WriteString(">")
-				cell.PrintHTML(buf)
-				buf.WriteString("</td>\n")
-			}
-			buf.WriteString("</tr>\n")
-		}
-		buf.WriteString("</tbody>\n")
-	}
-	buf.WriteString("</table>\n")
-}
-
-func (t *Table) printMarkdown(buf *markOut, s mdState) {
-	// inline all Text values in Header and Rows to
-	// get final, rendered widths
-	var (
-		hdr       = make([]string, len(t.Header))
-		rows      = make([][]string, 0, len(t.Rows))
-		maxWidths = make([]int, len(t.Header))
-
-		xb = &markOut{}
-		xs string
-	)
-
-	toString := func(txt *Text) string {
-		xb.Reset()
-		txt.printMarkdown(xb, s)
-		return strings.TrimSpace(xb.String())
-	}
-
-	for i, txt := range t.Header {
-		xs = toString(txt)
-		hdr[i] = xs
-		maxWidths[i] = utf8.RuneCountInString(xs)
-	}
-
-	for _, row := range t.Rows {
-		xrow := make([]string, len(hdr))
-		for j := range t.Header {
-			xs = toString(row[j])
-			xrow[j] = xs
-			if n := utf8.RuneCountInString(xs); n > maxWidths[j] {
-				maxWidths[j] = n
-			}
-		}
-		rows = append(rows, xrow)
-	}
-
-	buf.maybeQuoteNL('|')
-	for i, cell := range hdr {
-		buf.WriteString("| ")
-		pad(buf, cell, t.Align[i], maxWidths[i])
-		buf.WriteString(" ")
-	}
-	buf.WriteString("|")
-
-	buf.NL()
-	for i, a := range t.Align {
-		w := maxWidths[i]
-		buf.WriteString("| ")
-		switch a {
-		case "left":
-			buf.WriteString(":")
-			repeat(buf, '-', w-1)
-		case "center":
-			buf.WriteString(":")
-			repeat(buf, '-', w-2)
-			buf.WriteString(":")
-		case "right":
-			repeat(buf, '-', w-1)
-			buf.WriteString(":")
-		default:
-			repeat(buf, '-', w)
-		}
-		buf.WriteString(" ")
-	}
-	buf.WriteString("|")
-
-	for _, row := range rows {
-		buf.NL()
-		for i := range t.Header {
-			buf.WriteString("| ")
-			pad(buf, row[i], t.Align[i], maxWidths[i])
-			buf.WriteString(" ")
-		}
-		buf.WriteString("|")
-	}
-}
-
-func repeat(buf *markOut, c byte, n int) {
-	for i := 0; i < n; i++ {
-		buf.WriteByte(c)
-	}
-}
-
-func pad(buf *markOut, cell, align string, w int) {
-	n := w - utf8.RuneCountInString(cell)
-	switch align {
-	default:
-		buf.WriteString(cell)
-		repeat(buf, ' ', n)
-	case "right":
-		repeat(buf, ' ', n)
-		buf.WriteString(cell)
-	case "center":
-		repeat(buf, ' ', n/2)
-		buf.WriteString(cell)
-		repeat(buf, ' ', n-n/2)
-	}
-}
-
-func (b *tableBuilder) build(p buildState) Block {
+// build returns the [Table] for this tableBuilder.
+func (b *tableBuilder) build(p *parser) Block {
 	pos := p.pos()
 	pos.StartLine-- // builder does not count header
 	pos.EndLine = pos.StartLine + 1 + len(b.rows)
@@ -275,7 +294,8 @@ func (b *tableBuilder) build(p buildState) Block {
 	return t
 }
 
-func (b *tableBuilder) parseRow(p buildState, row tableTrimmed, line int, width int) []*Text {
+// parseRow TODO explain
+func (b *tableBuilder) parseRow(p *parser, row tableTrimmed, line int, width int) []*Text {
 	out := make([]*Text, 0, width)
 	pos := Position{StartLine: line, EndLine: line}
 	start := 0
@@ -309,6 +329,7 @@ func nop(text string) string {
 	return text
 }
 
+// tableUnescape TODO
 func tableUnescape(text string) string {
 	out := make([]byte, 0, len(text))
 	for i := 0; i < len(text); i++ {
@@ -322,6 +343,7 @@ func tableUnescape(text string) string {
 	return string(out)
 }
 
+// parseAlign TODO
 func (b *tableBuilder) parseAlign(delim tableTrimmed, n int) []string {
 	align := make([]string, 0, tableCount(delim))
 	start := 0
@@ -335,6 +357,7 @@ func (b *tableBuilder) parseAlign(delim tableTrimmed, n int) []string {
 	return align
 }
 
+// tableAlign TODO
 func tableAlign(cell string) string {
 	cell = tableTrimSpace(cell)
 	l := cell[0] == ':'

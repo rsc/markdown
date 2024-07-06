@@ -5,7 +5,6 @@
 package markdown
 
 import (
-	"bytes"
 	"fmt"
 	"slices"
 	"strings"
@@ -14,7 +13,235 @@ import (
 	"golang.org/x/text/cases"
 )
 
-func parseLinkRefDef(p buildState, s string) (int, bool) {
+// Note: Link and Image are the same underlying struct by design,
+// so that code can safely convert between *Link and *Image.
+
+// A Link is an [Inline] representing a [link] (<a> tag).
+//
+// [link]: https://spec.commonmark.org/0.31.2/#links
+type Link struct {
+	Inner     Inlines
+	URL       string
+	Title     string
+	TitleChar byte // ', " or )
+}
+
+// An Image is an [Inline] representing an [image] (<a> tag).
+//
+// [image]: https://spec.commonmark.org/0.31.2/#images
+type Image struct {
+	Inner     Inlines
+	URL       string
+	Title     string
+	TitleChar byte
+}
+
+func (*Link) Inline() {}
+
+func (x *Link) printHTML(p *printer) {
+	p.html(`<a href="`, htmlLinkEscaper.Replace(x.URL), `"`)
+	if x.Title != "" {
+		p.html(" title=\"")
+		p.html(htmlEscaper.Replace(x.Title))
+		p.html("\"")
+	}
+	p.html(">")
+	for _, c := range x.Inner {
+		c.printHTML(p)
+	}
+	p.html("</a>")
+}
+
+func (x *Link) printMarkdown(p *printer) {
+	p.WriteByte('[')
+	for _, c := range x.Inner {
+		c.printMarkdown(p)
+	}
+	p.WriteString("](")
+	u := mdLinkEscaper.Replace(x.URL)
+	if u == "" || strings.ContainsAny(u, " ") {
+		u = "<" + u + ">"
+	}
+	p.WriteString(u)
+	printLinkTitleMarkdown(p, x.Title, x.TitleChar)
+	p.WriteByte(')')
+}
+
+func printLinkTitleMarkdown(p *printer, title string, titleChar byte) {
+	if title == "" {
+		return
+	}
+	if titleChar == 0 {
+		titleChar = '\''
+	}
+	closeChar := titleChar
+	openChar := closeChar
+	if openChar == ')' {
+		openChar = '('
+	}
+	p.WriteString(" ")
+	p.WriteByte(openChar)
+	for i, line := range strings.Split(mdEscaper.Replace(title), "\n") {
+		if i > 0 {
+			p.nl()
+		}
+		p.WriteString(line)
+		p.noTrim()
+	}
+	p.WriteByte(closeChar)
+}
+
+func (x *Link) printText(p *printer) {
+	for _, c := range x.Inner {
+		c.printText(p)
+	}
+}
+
+func (*Image) Inline() {}
+
+func (x *Image) printHTML(p *printer) {
+	p.html(`<img src="`, htmlLinkEscaper.Replace(x.URL), `" alt="`)
+	i := p.buf.Len()
+	x.printText(p)
+	// GitHub and Goldmark both rewrite \n to space
+	// but the Dingus does not.
+	// The spec says title can be split across lines but not
+	// what happens at that point.
+	out := p.buf.Bytes()
+	for ; i < len(out); i++ {
+		if out[i] == '\n' {
+			out[i] = ' '
+		}
+	}
+	p.html(`"`)
+	if x.Title != "" {
+		p.html(` title="`)
+		p.text(x.Title)
+		p.html(`"`)
+	}
+	p.html(` />`)
+}
+
+func (x *Image) printMarkdown(p *printer) {
+	p.WriteString("!")
+	(*Link)(x).printMarkdown(p)
+}
+
+func (x *Image) printText(p *printer) {
+	for _, c := range x.Inner {
+		c.printText(p)
+	}
+}
+
+// parseLinkOpen is an [inlineParser] for a link open [.
+// The caller has checked that s[start] == '['.
+func parseLinkOpen(p *parser, s string, start int) (x Inline, end int, ok bool) {
+	return &openPlain{Plain{s[start : start+1]}, start + 1}, start + 1, true
+}
+
+// parseImageOpen is an [inlineParser] for a link open ![.
+// The caller has checked that s[start] == '!'.
+func parseImageOpen(_ *parser, s string, start int) (x Inline, end int, ok bool) {
+	if start+1 < len(s) && s[start+1] == '[' {
+		return &openPlain{Plain{s[start : start+2]}, start + 2}, start + 2, true
+	}
+	return
+}
+
+// parseLinkClose parses a link (or image) close ] or ](target) matching open.
+func parseLinkClose(p *parser, s string, start int, open *openPlain) (*Link, int, bool) {
+	i := start
+	if i+1 < len(s) {
+		switch s[i+1] {
+		case '(':
+			// Inline link - [Text](Dest Title), with Title omitted or both Dest and Title omitted.
+			i := skipSpace(s, i+2)
+			var dest, title string
+			var titleChar byte
+			if i < len(s) && s[i] != ')' {
+				var ok bool
+				dest, i, ok = parseLinkDest(s, i)
+				if !ok {
+					break
+				}
+				i = skipSpace(s, i)
+				if i < len(s) && s[i] != ')' {
+					title, titleChar, i, ok = parseLinkTitle(s, i)
+					if title == "" {
+						p.corner = true
+					}
+					if !ok {
+						break
+					}
+					i = skipSpace(s, i)
+				}
+			}
+			if i < len(s) && s[i] == ')' {
+				return &Link{URL: dest, Title: title, TitleChar: titleChar}, i + 1, true
+			}
+			// NOTE: Test malformed ( ) with shortcut reference
+			// TODO fall back on syntax error?
+
+		case '[':
+			// Full reference link - [Text][Label]
+			label, i, ok := parseLinkLabel(p, s, i+1)
+			if !ok {
+				break
+			}
+			if link, ok := p.links[normalizeLabel(label)]; ok {
+				return &Link{URL: link.URL, Title: link.Title}, i, true
+			}
+			// Note: Could break here, but CommonMark dingus does not
+			// fall back to trying Text for [Text][Label] when Label is unknown.
+			// Unclear from spec what the correct answer is.
+			return nil, 0, false
+		}
+	}
+
+	// Collapsed or shortcut reference link: [Text][] or [Text].
+	end := i + 1
+	if strings.HasPrefix(s[end:], "[]") {
+		end += 2
+	}
+
+	if link, ok := p.links[normalizeLabel(s[open.i:i])]; ok {
+		return &Link{URL: link.URL, Title: link.Title}, end, true
+	}
+	return nil, 0, false
+}
+
+// printLinks prints the links in the map, sorted by key,
+// as a sequence of [link reference definitions].
+//
+// [link reference definitions]: https://spec.commonmark.org/0.31.2/#link-reference-definitions
+func printLinks(p *printer, links map[string]*Link) {
+	// Print links sorted by keys for deterministic output.
+	var keys []string
+	for k := range links {
+		if k != "" {
+			keys = append(keys, k)
+		}
+	}
+	slices.Sort(keys)
+	for _, k := range keys {
+		l := links[k]
+		u := l.URL
+		if u == "" || strings.ContainsAny(u, " ") {
+			u = "<" + u + ">"
+		}
+		fmt.Fprintf(p, "[%s]: %s", k, u)
+		printLinkTitleMarkdown(p, l.Title, l.TitleChar)
+		p.nl()
+	}
+}
+
+// parseLinkRefDef parses and saves in p a [link reference definition]
+// at the start of s, if any.
+// It returns the length of the link reference definition
+// and whether one was found.
+//
+// [link reference definition]: https://spec.commonmark.org/0.31.2/#link-reference-definitions
+func parseLinkRefDef(p *parser, s string) (int, bool) {
 	// “A link reference definition consists of a link label,
 	// optionally preceded by up to three spaces of indentation,
 	// followed by a colon (:),
@@ -25,7 +252,7 @@ func parseLinkRefDef(p buildState, s string) (int, bool) {
 	// which if it is present must be separated from the link destination
 	// by spaces or tabs. No further character may occur.”
 	i := skipSpace(s, 0)
-	label, i, ok := parseLinkLabel(p.(*parseState), s, i)
+	label, i, ok := parseLinkLabel(p, s, i)
 	if !ok || i >= len(s) || s[i] != ':' {
 		return 0, false
 	}
@@ -35,7 +262,7 @@ func parseLinkRefDef(p buildState, s string) (int, bool) {
 	if !ok {
 		if suf != "" && suf[0] == '<' {
 			// Goldmark treats <<> as a link definition.
-			p.(*parseState).corner = true
+			p.corner = true
 		}
 		return 0, false
 	}
@@ -69,7 +296,7 @@ func parseLinkRefDef(p buildState, s string) (int, bool) {
 				if t == "" {
 					// Goldmark adds title="" in this case.
 					// We do not, nor does the Dingus.
-					p.(*parseState).corner = true
+					p.corner = true
 				}
 				title = t
 				titleChar = c
@@ -92,7 +319,13 @@ func parseLinkRefDef(p buildState, s string) (int, bool) {
 	return i, true
 }
 
-func parseLinkTitle(s string, i int) (title string, char byte, next int, found bool) {
+// parseLinkTitle parses a [link title] at s[i:], returning
+// the terminating character, one of " ' or );
+// the index just past the end of the link;
+// and whether a link was found at all.
+//
+// [link title]: https://spec.commonmark.org/0.31.2/#link-title
+func parseLinkTitle(s string, i int) (title string, char byte, end int, found bool) {
 	if i < len(s) && (s[i] == '"' || s[i] == '\'' || s[i] == '(') {
 		want := s[i]
 		if want == '(' {
@@ -116,7 +349,12 @@ func parseLinkTitle(s string, i int) (title string, char byte, next int, found b
 	return "", 0, 0, false
 }
 
-func parseLinkLabel(p *parseState, s string, i int) (string, int, bool) {
+// parseLinkLabel parses a [link label] at s[i:], returning
+// the label, the end index just past the label, and
+// whether a label was found at all.
+//
+// [link label]: https://spec.commonmark.org/0.31.2/#link-label
+func parseLinkLabel(p *parser, s string, i int) (string, int, bool) {
 	// “A link label begins with a left bracket ([) and ends with
 	// the first right bracket (]) that is not backslash-escaped.
 	// Between these brackets there must be at least one character
@@ -151,6 +389,7 @@ func parseLinkLabel(p *parseState, s string, i int) (string, int, bool) {
 	return "", 0, false
 }
 
+// normalizeLabel returns the normalized label for s, for uniquely identifying that label.
 func normalizeLabel(s string) string {
 	if strings.Contains(s, "[") || strings.Contains(s, "]") {
 		// Labels cannot have [ ] so avoid the work of translating.
@@ -189,11 +428,25 @@ func normalizeLabel(s string) string {
 	}
 	s = b.String()
 	if hi {
+		// TODO: Avoid golang.org/x/text/cases.
+		// It is more general than we need since we are not passing in a specific language.
+		// Also, https://www.unicode.org/faq/casemap_charprop.html#2 says
+		// “case-folded text should be used solely for internal processing and
+		// generally should not be stored or displayed to the end user.”
+		// But we use this string as the map key in p.links and then
+		// display it in printLinks.
+		// We should probably record the actual label separate from the folded one.
+		// Table at https://www.unicode.org/Public/12.1.0/ucd/CaseFolding.txt.
 		s = cases.Fold().String(s)
 	}
 	return s
 }
 
+// parseLinkDest parses a [link destination] at s[i:], returning
+// the destination, the end index just past the destination,
+// and whether a destination was found.
+//
+// [link destination]: https://spec.commonmark.org/0.31.2/#link-destination
 func parseLinkDest(s string, i int) (string, int, bool) {
 	if i >= len(s) {
 		return "", 0, false
@@ -256,7 +509,34 @@ Loop:
 	return mdUnescape(dest), j, true
 }
 
-func parseAutoLinkURI(s string, i int) (Inline, int, bool) {
+// An AutoLink is an [Inline] representing an [autolink],
+// which is an absolute URL or email address inside < > brackets.
+//
+// [autolink]: https://spec.commonmark.org/0.31.2/#autolinks
+type AutoLink struct {
+	Text string
+	URL  string
+}
+
+func (*AutoLink) Inline() {}
+
+func (x *AutoLink) printHTML(p *printer) {
+	p.html(`<a href="`, htmlLinkEscaper.Replace(x.URL), `">`)
+	p.text(x.Text)
+	p.html(`</a>`)
+}
+
+func (x *AutoLink) printMarkdown(p *printer) {
+	fmt.Fprintf(p, "<%s>", x.Text)
+}
+
+func (x *AutoLink) printText(p *printer) {
+	p.text(x.Text)
+}
+
+// parseAutoLinkURI is an [inlineParser] for a URI [AutoLink].
+// The caller has checked that s[start] == '<'.
+func parseAutoLinkURI(s string, i int) (x Inline, end int, ok bool) {
 	// CommonMark 0.30:
 	//
 	//	For purposes of this spec, a scheme is any sequence of 2–32 characters
@@ -271,28 +551,30 @@ func parseAutoLinkURI(s string, i int) (Inline, int, bool) {
 
 	j := i
 	if j+1 >= len(s) || s[j] != '<' || !isLetter(s[j+1]) {
-		return nil, 0, false
+		return
 	}
 	j++
 	for j < len(s) && isScheme(s[j]) && j-(i+1) <= 32 {
 		j++
 	}
 	if j-(i+1) < 2 || j-(i+1) > 32 || j >= len(s) || s[j] != ':' {
-		return nil, 0, false
+		return
 	}
 	j++
 	for j < len(s) && isURL(s[j]) {
 		j++
 	}
 	if j >= len(s) || s[j] != '>' {
-		return nil, 0, false
+		return
 	}
 	link := s[i+1 : j]
 	// link = mdUnescaper.Replace(link)
 	return &AutoLink{link, link}, j + 1, true
 }
 
-func parseAutoLinkEmail(s string, i int) (Inline, int, bool) {
+// parseAutoLinkEmail is an [inlineParser] for an email [AutoLink].
+// The caller has checked that s[start] == '<'.
+func parseAutoLinkEmail(s string, i int) (x Inline, end int, ok bool) {
 	// CommonMark 0.30:
 	//
 	//	An email address, for these purposes, is anything that matches
@@ -302,24 +584,24 @@ func parseAutoLinkEmail(s string, i int) (Inline, int, bool) {
 
 	j := i
 	if j+1 >= len(s) || s[j] != '<' || !isUser(s[j+1]) {
-		return nil, 0, false
+		return
 	}
 	j++
 	for j < len(s) && isUser(s[j]) {
 		j++
 	}
 	if j >= len(s) || s[j] != '@' {
-		return nil, 0, false
+		return
 	}
 	for {
 		j++
-		n, ok := skipDomainElem(s[j:])
-		if !ok {
-			return nil, 0, false
+		n, ok1 := skipDomainElem(s[j:])
+		if !ok1 {
+			return
 		}
 		j += n
 		if j >= len(s) || s[j] != '.' && s[j] != '>' {
-			return nil, 0, false
+			return
 		}
 		if s[j] == '>' {
 			break
@@ -329,27 +611,9 @@ func parseAutoLinkEmail(s string, i int) (Inline, int, bool) {
 	return &AutoLink{email, "mailto:" + email}, j + 1, true
 }
 
-func isUser(c byte) bool {
-	if isLetterDigit(c) {
-		return true
-	}
-	s := ".!#$%&'*+/=?^_`{|}~-"
-	for i := 0; i < len(s); i++ {
-		if c == s[i] {
-			return true
-		}
-	}
-	return false
-}
-
-func isHexDigit(c byte) bool {
-	return 'A' <= c && c <= 'F' || 'a' <= c && c <= 'f' || '0' <= c && c <= '9'
-}
-
-func isDigit(c byte) bool {
-	return '0' <= c && c <= '9'
-}
-
+// skipDomainElem reports the length of a leading domain element in s,
+// along with whether there is one.
+// TODO quadratic.
 func skipDomainElem(s string) (int, bool) {
 	// String of LDH, up to 63 in length, with LetterDigit
 	// at both ends (1-letter/digit names are OK).
@@ -367,177 +631,38 @@ func skipDomainElem(s string) (int, bool) {
 	return i, true
 }
 
+// isUser reports whether c is an email user byte.
+func isUser(c byte) bool {
+	// A-Za-z0-9 plus ".!#$%&'*+/=?^_`{|}~-"
+	return c == '!' ||
+		'#' <= c && c <= '\'' ||
+		'*' <= c && c <= '+' ||
+		'-' <= c && c <= '9' ||
+		c == '=' ||
+		c == '?' ||
+		'A' <= c && c <= 'Z' ||
+		'^' <= c && c <= '`' ||
+		'a' <= c && c <= 'z' ||
+		'{' <= c && c <= '~'
+}
+
+// isScheme reports whether c is a scheme character.
 func isScheme(c byte) bool {
 	return isLetterDigit(c) || c == '+' || c == '.' || c == '-'
 }
 
+// isURL reports whether c is a URL character.
 func isURL(c byte) bool {
 	return c > ' ' && c != '<' && c != '>'
-}
-
-type AutoLink struct {
-	Text string
-	URL  string
-}
-
-func (*AutoLink) Inline() {}
-
-func (x *AutoLink) PrintHTML(buf *bytes.Buffer) {
-	fmt.Fprintf(buf, "<a href=\"%s\">%s</a>", htmlLinkEscaper.Replace(x.URL), htmlEscaper.Replace(x.Text))
-}
-
-func (x *AutoLink) printMarkdown(buf *markOut) {
-	fmt.Fprintf(buf, "<%s>", x.Text)
-}
-
-func (x *AutoLink) PrintText(buf *bytes.Buffer) {
-	fmt.Fprintf(buf, "%s", htmlEscaper.Replace(x.Text))
-}
-
-type Link struct {
-	Inner     []Inline
-	URL       string
-	Title     string
-	TitleChar byte // ', " or )
-}
-
-func (*Link) Inline() {}
-
-func (x *Link) PrintHTML(buf *bytes.Buffer) {
-	fmt.Fprintf(buf, "<a href=\"%s\"", htmlLinkEscaper.Replace(x.URL))
-	if x.Title != "" {
-		fmt.Fprintf(buf, " title=\"%s\"", htmlQuoteEscaper.Replace(x.Title))
-	}
-	buf.WriteString(">")
-	for _, c := range x.Inner {
-		c.PrintHTML(buf)
-	}
-	buf.WriteString("</a>")
-}
-
-func (x *Link) printMarkdown(buf *markOut) {
-	buf.WriteByte('[')
-	x.printRemainingMarkdown(buf)
-}
-
-func printLinks(buf *markOut, links map[string]*Link) {
-	// Print links sorted by keys for deterministic output.
-	var keys []string
-	for k := range links {
-		if k != "" {
-			keys = append(keys, k)
-		}
-	}
-	slices.Sort(keys)
-	for _, k := range keys {
-		l := links[k]
-		u := l.URL
-		if u == "" || strings.ContainsAny(u, " ") {
-			u = "<" + u + ">"
-		}
-		fmt.Fprintf(buf, "[%s]: %s", k, u)
-		printLinkTitleMarkdown(buf, l.Title, l.TitleChar)
-		buf.NL()
-	}
-}
-
-func (x *Link) printRemainingMarkdown(buf *markOut) {
-	for _, c := range x.Inner {
-		c.printMarkdown(buf)
-	}
-	buf.WriteString("](")
-	u := mdLinkEscaper.Replace(x.URL)
-	if u == "" || strings.ContainsAny(u, " ") {
-		u = "<" + u + ">"
-	}
-	buf.WriteString(u)
-	printLinkTitleMarkdown(buf, x.Title, x.TitleChar)
-	buf.WriteByte(')')
-}
-
-func printLinkTitleMarkdown(buf *markOut, title string, titleChar byte) {
-	if title == "" {
-		return
-	}
-	if titleChar == 0 {
-		titleChar = '\''
-	}
-	closeChar := titleChar
-	openChar := closeChar
-	if openChar == ')' {
-		openChar = '('
-	}
-	buf.WriteString(" ")
-	buf.WriteByte(openChar)
-	for i, line := range strings.Split(mdEscaper.Replace(title), "\n") {
-		if i > 0 {
-			buf.NL()
-		}
-		buf.WriteString(line)
-		buf.noTrim()
-	}
-	buf.WriteByte(closeChar)
-}
-
-func (x *Link) PrintText(buf *bytes.Buffer) {
-	for _, c := range x.Inner {
-		c.PrintText(buf)
-	}
-}
-
-type Image struct {
-	Inner     []Inline
-	URL       string
-	Title     string
-	TitleChar byte
-}
-
-func (*Image) Inline() {}
-
-func (x *Image) PrintHTML(buf *bytes.Buffer) {
-	fmt.Fprintf(buf, "<img src=\"%s\"", htmlLinkEscaper.Replace(x.URL))
-	fmt.Fprintf(buf, " alt=\"")
-	i := buf.Len()
-	for _, c := range x.Inner {
-		c.PrintText(buf)
-	}
-	// GitHub and Goldmark both rewrite \n to space
-	// but the Dingus does not.
-	// The spec says title can be split across lines but not
-	// what happens at that point.
-	out := buf.Bytes()
-	for ; i < len(out); i++ {
-		if out[i] == '\n' {
-			out[i] = ' '
-		}
-	}
-	fmt.Fprintf(buf, "\"")
-	if x.Title != "" {
-		fmt.Fprintf(buf, " title=\"%s\"", htmlQuoteEscaper.Replace(x.Title))
-	}
-	buf.WriteString(" />")
-}
-
-func (x *Image) printMarkdown(buf *markOut) {
-	buf.WriteString("![")
-	(*Link)(x).printRemainingMarkdown(buf)
-}
-
-func (x *Image) PrintText(buf *bytes.Buffer) {
-	for _, c := range x.Inner {
-		c.PrintText(buf)
-	}
 }
 
 // GitHub Flavored Markdown autolinks extension
 // https://github.github.com/gfm/#autolinks-extension-
 
-// autoLinkMore rewrites any extended autolinks in the body
+// autoLinkText rewrites any extended autolinks in the body
 // and returns the result.
 //
-// body is a list of Plain, Emph, Strong, and Del nodes.
-// Two Plains only appear consecutively when one is a
-// potential emphasis marker that ended up being plain after all, like "_" or "**".
+// list is a list of Plain, Emph, Strong, and Del nodes.
 // There are no Link nodes.
 //
 // The GitHub “spec” declares that “autolinks can only come at the
@@ -550,7 +675,9 @@ func (x *Image) PrintText(buf *bytes.Buffer) {
 // Since the only point of implementing GitHub Flavored Markdown
 // is to match GitHub's behavior, we do what they do, not what they say,
 // at least for now.
-func (p *parseState) autoLinkText(list []Inline) []Inline {
+//
+// [GitHub “spec”]: https://github.github.com/gfm/
+func autoLinkText(p *parser, list []Inline) []Inline {
 	if !p.AutoLinkText {
 		return list
 	}
@@ -559,7 +686,7 @@ func (p *parseState) autoLinkText(list []Inline) []Inline {
 	for i, x := range list {
 		switch x := x.(type) {
 		case *Plain:
-			if rewrite := p.autoLinkPlain(x.Text); rewrite != nil {
+			if rewrite := autoLinkPlain(p, x.Text); rewrite != nil {
 				if out == nil {
 					out = append(out, list[:i]...)
 				}
@@ -567,11 +694,11 @@ func (p *parseState) autoLinkText(list []Inline) []Inline {
 				continue
 			}
 		case *Strong:
-			x.Inner = p.autoLinkText(x.Inner)
+			x.Inner = autoLinkText(p, x.Inner)
 		case *Del:
-			x.Inner = p.autoLinkText(x.Inner)
+			x.Inner = autoLinkText(p, x.Inner)
 		case *Emph:
-			x.Inner = p.autoLinkText(x.Inner)
+			x.Inner = autoLinkText(p, x.Inner)
 		}
 		if out != nil {
 			out = append(out, x)
@@ -583,31 +710,34 @@ func (p *parseState) autoLinkText(list []Inline) []Inline {
 	return out
 }
 
-func (p *parseState) autoLinkPlain(s string) []Inline {
+// autoLinkPlain looks for text to auto-link in the plain text s.
+// If it finds any, it returns an Inlines that should replace Plain{s}.
+func autoLinkPlain(p *parser, s string) Inlines {
 	vd := &validDomainChecker{s: s}
 	var out []Inline
 Restart:
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if c == '@' {
-			if before, link, after, ok := p.parseAutoEmail(s, i); ok {
+			if before, link, after, ok := parseAutoEmail(p, s, i); ok {
 				if before != "" {
 					out = append(out, &Plain{Text: before})
 				}
 				out = append(out, link)
-				vd.skip(len(s) - len(after))
+				vd.removePrefix(len(s) - len(after))
 				s = after
 				goto Restart
 			}
 		}
 
+		// Might this be http:// https:// mailto:// xmpp:// or www. ?
 		if (c == 'h' || c == 'm' || c == 'x' || c == 'w') && (i == 0 || !isLetter(s[i-1])) {
-			if link, after, ok := p.parseAutoProto(s, i, vd); ok {
+			if link, after, ok := parseAutoURL(p, s, i, vd); ok {
 				if i > 0 {
 					out = append(out, &Plain{Text: s[:i]})
 				}
 				out = append(out, link)
-				vd.skip(len(s) - len(after))
+				vd.removePrefix(len(s) - len(after))
 				s = after
 				goto Restart
 			}
@@ -620,7 +750,15 @@ Restart:
 	return out
 }
 
-func (p *parseState) parseAutoProto(s string, i int, vd *validDomainChecker) (link *Link, after string, found bool) {
+// parseAutoURL parses an [extended URL autolink] or [extended www autolink],
+// or [extended protocol autolink] from s[i:] if one exists,
+// using vd as its valid domain checker.
+// It returns the link, the text following the auto-link, and whether a link was found at all.
+//
+// [extended URL autolink]: https://github.github.com/gfm/#extended-url-autolink
+// [extended www autolink]: https://github.github.com/gfm/#extended-www-autolink
+// [extended protocol autolink]: https://github.github.com/gfm/#extended-email-autolink
+func parseAutoURL(p *parser, s string, i int, vd *validDomainChecker) (link *Link, after string, found bool) {
 	if s == "" {
 		// unreachable unless called wrong
 		return
@@ -635,7 +773,7 @@ func (p *parseState) parseAutoProto(s string, i int, vd *validDomainChecker) (li
 		} else {
 			return
 		}
-		return p.parseAutoHTTP(s[i:i+n], s, i, i+n, i+n+1, vd)
+		return parseAutoHTTP(p, s[i:i+n], s, i, i+n, i+n+1, vd)
 	case 'w':
 		if !strings.HasPrefix(s[i:], "www.") {
 			return
@@ -648,25 +786,30 @@ func (p *parseState) parseAutoProto(s string, i int, vd *validDomainChecker) (li
 		if p.AutoLinkAssumeHTTP {
 			scheme = "http://"
 		}
-		return p.parseAutoHTTP(scheme, s, i, i, i+4, vd)
+		return parseAutoHTTP(p, scheme, s, i, i, i+4, vd)
 	case 'm':
 		if !strings.HasPrefix(s[i:], "mailto:") {
 			return
 		}
-		return p.parseAutoMailto(s, i)
+		return parseAutoMailto(p, s, i)
 	case 'x':
 		if !strings.HasPrefix(s[i:], "xmpp:") {
 			return
 		}
-		return p.parseAutoXmpp(s, i)
+		return parseAutoXmpp(p, s, i)
 	}
 	// unreachable unless called wrong
 	return
 }
 
-// parseAutoWWW parses an extended www autolink.
-// https://github.github.com/gfm/#extended-www-autolink
-func (p *parseState) parseAutoHTTP(scheme, s string, textstart, start, min int, vd *validDomainChecker) (link *Link, after string, found bool) {
+// parseAutoHTTP parses a URL link, returning the link,
+// the text following the link, and whether a link was found at all.
+//
+// The text of the link starts at s[textstart:].
+// The actual link URL starts at s[start:].
+// The link must use at least s[start:min] or it is not a valid link.
+// vd is the domain checker to use.
+func parseAutoHTTP(p *parser, scheme, s string, textstart, start, min int, vd *validDomainChecker) (link *Link, after string, found bool) {
 	n, ok := vd.parseValidDomain(start)
 	if !ok {
 		return
@@ -757,60 +900,13 @@ Trim:
 	return link, s[i:], true
 }
 
-type validDomainChecker struct {
-	s   string
-	cut int // before this index, no valid domains
-}
-
-func (v *validDomainChecker) skip(i int) {
-	v.s = v.s[i:]
-	v.cut -= i
-}
-
-// parseValidDomain parses a valid domain.
-// https://github.github.com/gfm/#valid-domain
+// parseAutoEmail parses an [extended email autolink] with its @ sign at s[i].
+// The parser has checked that s[i] == '@'.
+// parseAutoEmail returns the text of s before the link, the link, the text after the link,
+// and whether a link was found at all.
 //
-// If s starts with a valid domain, parseValidDomain returns
-// the length of that domain and true. If s does not start with
-// a valid domain, parseValidDomain returns n, false,
-// where n is the length of a prefix guaranteed not to be acceptable
-// to any future call to parseValidDomain.
-//
-// “A valid domain consists of segments of alphanumeric characters,
-// underscores (_) and hyphens (-) separated by periods (.).
-// There must be at least one period, and no underscores may be
-// present in the last two segments of the domain.”
-//
-// The spec does not spell out whether segments can be empty.
-// Empirically, in GitHub's implementation they can.
-func (v *validDomainChecker) parseValidDomain(start int) (n int, found bool) {
-	if start < v.cut {
-		return 0, false
-	}
-	i := start
-	dots := 0
-	for ; i < len(v.s); i++ {
-		c := v.s[i]
-		if c == '_' {
-			dots = -2
-			continue
-		}
-		if c == '.' {
-			dots++
-			continue
-		}
-		if !isLDH(c) {
-			break
-		}
-	}
-	if dots >= 0 && i > start {
-		return i - start, true
-	}
-	v.cut = i
-	return 0, false
-}
-
-func (p *parseState) parseAutoEmail(s string, i int) (before string, link *Link, after string, ok bool) {
+// [extended email autolink]: https://github.github.com/gfm/#extended-email-autolink
+func parseAutoEmail(p *parser, s string, i int) (before string, link *Link, after string, ok bool) {
 	if s[i] != '@' {
 		// unreachable unless called wrong
 		return
@@ -860,7 +956,12 @@ func (p *parseState) parseAutoEmail(s string, i int) (before string, link *Link,
 	return s[:j], link, s[k:], true
 }
 
-func (p *parseState) parseAutoMailto(s string, i int) (link *Link, after string, ok bool) {
+// parseAutoMailto parses a mailto: [extended protocol link] from s[i:].
+// The parser has checked that s[i:] begins with "mailto:".
+// parseAutoMailto returns the link, the text after the link, and whether a link was found at all.
+//
+// [extended protocol link]: https://github.github.com/gfm/#extended-protocol-autolink
+func parseAutoMailto(p *parser, s string, i int) (link *Link, after string, ok bool) {
 	j := i + len("mailto:")
 	for j < len(s) && (isLDH(s[j]) || s[j] == '_' || s[j] == '+' || s[j] == '.') {
 		j++
@@ -868,7 +969,7 @@ func (p *parseState) parseAutoMailto(s string, i int) (link *Link, after string,
 	if j >= len(s) || s[j] != '@' {
 		return
 	}
-	before, link, after, ok := p.parseAutoEmail(s[i:], j-i)
+	before, link, after, ok := parseAutoEmail(p, s[i:], j-i)
 	if before != "mailto:" || !ok {
 		return nil, "", false
 	}
@@ -876,7 +977,12 @@ func (p *parseState) parseAutoMailto(s string, i int) (link *Link, after string,
 	return link, after, true
 }
 
-func (p *parseState) parseAutoXmpp(s string, i int) (link *Link, after string, ok bool) {
+// parseAutoXmpp parses an xmpp: [extended protocol link] from s[i:].
+// The parser has checked that s[i:] begins with "xmpp:".
+// parseAutoXmpp returns the link, the text after the link, and whether a link was found at all.
+//
+// [extended protocol link]: https://github.github.com/gfm/#extended-protocol-autolink
+func parseAutoXmpp(p *parser, s string, i int) (link *Link, after string, ok bool) {
 	j := i + len("xmpp:")
 	for j < len(s) && (isLDH(s[j]) || s[j] == '_' || s[j] == '+' || s[j] == '.') {
 		j++
@@ -884,7 +990,7 @@ func (p *parseState) parseAutoXmpp(s string, i int) (link *Link, after string, o
 	if j >= len(s) || s[j] != '@' {
 		return
 	}
-	before, link, after, ok := p.parseAutoEmail(s[i:], j-i)
+	before, link, after, ok := parseAutoEmail(p, s[i:], j-i)
 	if before != "xmpp:" || !ok {
 		return nil, "", false
 	}
@@ -899,4 +1005,65 @@ func (p *parseState) parseAutoXmpp(s string, i int) (link *Link, after string, o
 	link.Inner[0] = &Plain{Text: url}
 	link.URL = url
 	return link, after, true
+}
+
+// A validDomainChecker implements the operation of parsing a valid domain
+// starting at a specific offset in a string, but it amortizes analysis of the string
+// across multiple calls to avoid quadratic behavior when the checker is invoked
+// at every offset (or many offsets) in the string.
+type validDomainChecker struct {
+	s   string
+	cut int // before this index, no valid domains
+}
+
+// removePrefix removes the first n bytes from the target string s,
+// so that future calls are valid for s[n:], not s.
+func (v *validDomainChecker) removePrefix(n int) {
+	v.s = v.s[n:]
+	v.cut -= n
+}
+
+// parseValidDomain parses a [valid domain].
+//
+// If s[start:] starts with a valid domain, parseValidDomain returns
+// the length of that domain and true. If s[start:] does not start with
+// a valid domain, parseValidDomain returns n, false,
+// where n is the length of a prefix guaranteed not to be acceptable
+// to any future call to parseValidDomain.
+//
+// “A valid domain consists of segments of alphanumeric characters,
+// underscores (_) and hyphens (-) separated by periods (.).
+// There must be at least one period, and no underscores may be
+// present in the last two segments of the domain.”
+//
+// The spec does not spell out whether segments can be empty.
+// Empirically, in GitHub's implementation they can.
+//
+// [valid domain]: https://github.github.com/gfm/#valid-domain
+func (v *validDomainChecker) parseValidDomain(start int) (n int, found bool) {
+	if start < v.cut {
+		// A previous call established there are no valid domains before v.cut.
+		return 0, false
+	}
+	i := start
+	dots := 0
+	for ; i < len(v.s); i++ {
+		c := v.s[i]
+		if c == '_' {
+			dots = -2
+			continue
+		}
+		if c == '.' {
+			dots++
+			continue
+		}
+		if !isLDH(c) {
+			break
+		}
+	}
+	if dots >= 0 && i > start {
+		return i - start, true
+	}
+	v.cut = i // there are no valid domains before i
+	return 0, false
 }

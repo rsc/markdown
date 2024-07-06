@@ -5,22 +5,32 @@
 package markdown
 
 import (
-	"bytes"
-	"fmt"
 	"strings"
 )
 
+// A CodeBlock is a [Block] representing an [indented code block]
+// or [fenced code block],
+// usually displayed in <pre><code> tags.
+//
+// When printing a CodeBlock as Markdown, the Fence field is used as
+// a starting hint but is made longer as needed if the suggested fence text
+// appears in Text.
+//
+// [indented code block]: https://spec.commonmark.org/0.31.2/#indented-code-blocks
+// [fenced code block]: https://spec.commonmark.org/0.31.2/#fenced-code-blocks
 type CodeBlock struct {
 	Position
-	Fence string
-	Info  string
-	Text  []string
+	Fence string   // fence to use
+	Info  string   // info following open fence
+	Text  []string // lines of code block
 }
 
-func (b *CodeBlock) PrintHTML(buf *bytes.Buffer) {
-	buf.WriteString("<pre><code")
+func (*CodeBlock) Block() {}
+
+func (b *CodeBlock) printHTML(p *printer) {
+	p.html("<pre><code")
 	if b.Info != "" {
-		// https://spec.commonmark.org/0.30/#info-string
+		// https://spec.commonmark.org/0.31.2/#info-string
 		// “The first word of the info string is typically used to
 		// specify the language of the code sample...”
 		// No definition of what “first word” means though.
@@ -32,181 +42,184 @@ func (b *CodeBlock) PrintHTML(buf *bytes.Buffer) {
 				break
 			}
 		}
-		fmt.Fprintf(buf, " class=\"language-%s\"", htmlQuoteEscaper.Replace(lang))
+		p.html(` class="language-`)
+		p.text(lang)
+		p.html(`"`)
 	}
-	buf.WriteString(">")
-	if b.Fence == "" { // TODO move
-		for len(b.Text) > 0 && trimSpaceTab(b.Text[len(b.Text)-1]) == "" {
-			b.Text = b.Text[:len(b.Text)-1]
-		}
-	}
+	p.WriteString(">")
 	for _, s := range b.Text {
-		buf.WriteString(htmlEscaper.Replace(s))
-		buf.WriteString("\n")
+		p.text(s, "\n")
 	}
-	buf.WriteString("</code></pre>\n")
+	p.html("</code></pre>\n")
 }
 
-// func initialSpaces(s string) int {
-// 	for i := 0; i < len(s); i++ {
-// 		if s[i] != ' ' {
-// 			return i
-// 		}
-// 	}
-// 	return len(s)
-// }
-
-func (b *CodeBlock) printMarkdown(buf *markOut, s mdState) {
+func (b *CodeBlock) printMarkdown(p *printer) {
 	if b.Fence == "" {
-		buf.maybeNL()
+		p.maybeNL()
 		for i, line := range b.Text {
-			// TODO Ignore final empty line (why is it even there?).
-			if i == len(b.Text)-1 && len(line) == 0 {
-				break
-			}
 			if i > 0 {
-				buf.NL()
+				p.nl()
 			}
-			buf.WriteString("    ")
-			buf.WriteString(line)
-			buf.noTrim()
+			p.md("    ")
+			p.md(line)
+			p.noTrim()
 		}
 	} else {
-		if buf.tight == 0 {
-			buf.maybeNL()
+		// TODO compute correct fence
+		if p.tight == 0 {
+			p.maybeNL()
 		}
-		buf.WriteString(b.Fence)
-		buf.WriteString(b.Info)
+		p.md(b.Fence)
+		p.md(b.Info)
 		for _, line := range b.Text {
-			buf.NL()
-			buf.WriteString(line)
-			buf.noTrim()
+			p.nl()
+			p.md(line)
+			p.noTrim()
 		}
-		buf.NL()
-		buf.WriteString(b.Fence)
+		p.nl()
+		p.md(b.Fence)
 	}
 }
 
-func newPre(p *parseState, s line) (line, bool) {
-	peek2 := s
-	if p.para() == nil && peek2.trimSpace(4, 4, false) && !peek2.isBlank() {
-		b := &preBuilder{ /*indent: strings.TrimSuffix(s.string(), peek2.string())*/ }
-		p.addBlock(b)
-		p.corner = p.corner || peek2.nl != '\n' // goldmark does not normalize to \n
-		b.text = append(b.text, peek2.string())
-		return line{}, true
-	}
-	return s, false
-}
-
-func newFence(p *parseState, s line) (line, bool) {
-	var fence, info string
-	var n int
+// startIndentedCodeBlock is a [starter] for an indented [CodeBlock].
+// See https://spec.commonmark.org/0.31.2/#indented-code-blocks.
+func startIndentedCodeBlock(p *parser, s line) (line, bool) {
+	// Line must start with 4 spaces and then not be blank.
 	peek := s
-	if peek.trimFence(&fence, &info, &n) {
-		if fence[0] == '~' && info != "" {
-			// goldmark does not handle info after ~~~
-			p.corner = true
-		} else if info != "" && !isLetter(info[0]) {
-			// goldmark does not allow numbered info.
-			// goldmark does not treat a tab as introducing a new word.
-			p.corner = true
-		}
-		for _, c := range info {
-			if isUnicodeSpace(c) {
-				if c != ' ' {
-					// goldmark only breaks on space
-					p.corner = true
-				}
-				break
-			}
-		}
-
-		p.addBlock(&fenceBuilder{fence, info, n, nil})
-		return line{}, true
+	if p.para() != nil || !peek.trimSpace(4, 4, false) || peek.isBlank() {
+		return s, false
 	}
-	return s, false
+
+	b := &indentBuilder{}
+	p.addBlock(b)
+	if peek.nl != '\n' {
+		p.corner = true // goldmark does not normalize to \n
+	}
+	b.text = append(b.text, peek.string())
+	return line{}, true
 }
 
-func (s *line) trimFence(fence, info *string, n *int) bool {
+// startFencedCodeBlock is a [starter] for a fenced [CodeBlock].
+// See https://spec.commonmark.org/0.31.2/#fenced-code-blocks.
+func startFencedCodeBlock(p *parser, s line) (line, bool) {
+	// Line must start with fence.
+	indent, fence, info, ok := trimFence(&s)
+	if !ok {
+		return s, false
+	}
+
+	// Note presence of corner cases, for testing.
+	if fence[0] == '~' && info != "" {
+		// goldmark does not handle info after ~~~
+		p.corner = true
+	} else if info != "" && !isLetter(info[0]) {
+		// goldmark does not allow numbered info.
+		// goldmark does not treat a tab as introducing a new word.
+		p.corner = true
+	}
+	for _, c := range info {
+		if isUnicodeSpace(c) {
+			if c != ' ' {
+				// goldmark only breaks on space
+				p.corner = true
+			}
+			break
+		}
+	}
+
+	p.addBlock(&fenceBuilder{indent, fence, info, nil})
+	return line{}, true
+}
+
+// trimFence attempts to trim leading indentation (up to 3 spaces),
+// a code fence, and an info string from s.
+// If successful, it returns those values and ok=true, leaving s empty.
+// If unsuccessful, it leaves s unmodified and returns ok=false.
+func trimFence(s *line) (indent int, fence, info string, ok bool) {
 	t := *s
-	*n = 0
-	for *n < 3 && t.trimSpace(1, 1, false) {
-		*n++
+	indent = 0
+	for indent < 3 && t.trimSpace(1, 1, false) {
+		indent++
 	}
-	switch c := t.peek(); c {
-	case '`', '~':
-		f := t.string()
-		n := 0
-		for i := 0; ; i++ {
-			if !t.trim(c) {
-				if i >= 3 {
-					break
-				}
-				return false
-			}
-			n++
-		}
-		txt := mdUnescaper.Replace(t.trimString())
-		if c == '`' && strings.Contains(txt, "`") {
-			return false
-		}
-		txt = trimSpaceTab(txt)
-		*info = txt
+	c := t.peek()
+	if c != '`' && c != '~' {
+		return
+	}
 
-		*fence = f[:n]
-		*s = line{}
-		return true
+	f := t.string()
+	n := 0
+	for t.trim(c) {
+		n++
 	}
-	return false
+	if n < 3 {
+		return
+	}
+
+	txt := mdUnescaper.Replace(t.trimString())
+	if c == '`' && strings.Contains(txt, "`") {
+		return
+	}
+	info = trimSpaceTab(txt)
+	fence = f[:n]
+	ok = true
+	*s = line{}
+	return
 }
 
-// For indented code blocks.
-type preBuilder struct {
+// An indentBuilder is a [blockBuilder] for an indented (unfenced) [CodeBlock].
+type indentBuilder struct {
 	indent string
 	text   []string
 }
 
-func (c *preBuilder) extend(p *parseState, s line) (line, bool) {
+func (c *indentBuilder) extend(p *parser, s line) (line, bool) {
+	// Extension lines must start with 4 spaces or be blank.
 	if !s.trimSpace(4, 4, true) {
 		return s, false
 	}
 	c.text = append(c.text, s.string())
-	p.corner = p.corner || s.nl != '\n' // goldmark does not normalize to \n
+	if s.nl != '\n' {
+		p.corner = true // goldmark does not normalize to \n
+	}
 	return line{}, true
 }
 
-func (b *preBuilder) build(p buildState) Block {
+func (b *indentBuilder) build(p *parser) Block {
+	// Remove trailing blank lines, which are often used
+	// just to separate the indented code block from what follows.
+	for len(b.text) > 0 && b.text[len(b.text)-1] == "" {
+		b.text = b.text[:len(b.text)-1]
+	}
 	return &CodeBlock{p.pos(), "", "", b.text}
 }
 
+// A fenceBuilder is a [blockBuilder] for a fenced [CodeBlock].
 type fenceBuilder struct {
-	fence string
-	info  string
-	n     int
-	text  []string
+	indent int
+	fence  string
+	info   string
+	text   []string
 }
 
-func (c *fenceBuilder) extend(p *parseState, s line) (line, bool) {
-	var fence, info string
-	var n int
-	if t := s; t.trimFence(&fence, &info, &n) && strings.HasPrefix(fence, c.fence) && info == "" {
+func (c *fenceBuilder) extend(p *parser, s line) (line, bool) {
+	// Check for closing fence, which must be at least as long as opening fence, with no info.
+	// The closing fence can be indented less than the opening one.
+	peek := s
+	if _, fence, info, ok := trimFence(&peek); ok && strings.HasPrefix(fence, c.fence) && info == "" {
 		return line{}, false
 	}
-	if !s.trimSpace(c.n, c.n, false) {
+
+	// Otherwise trim the indentation from the fence line, if present.
+	if !s.trimSpace(c.indent, c.indent, false) {
 		p.corner = true // goldmark mishandles fenced blank lines with not enough spaces
-		s.trimSpace(0, c.n, false)
+		s.trimSpace(0, c.indent, false)
 	}
+
 	c.text = append(c.text, s.string())
 	p.corner = p.corner || s.nl != '\n' // goldmark does not normalize to \n
 	return line{}, true
 }
 
-func (c *fenceBuilder) build(p buildState) Block {
-	return &CodeBlock{
-		p.pos(),
-		c.fence,
-		c.info,
-		c.text,
-	}
+func (c *fenceBuilder) build(p *parser) Block {
+	return &CodeBlock{p.pos(), c.fence, c.info, c.text}
 }

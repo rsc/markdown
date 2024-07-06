@@ -4,28 +4,42 @@
 
 package markdown
 
-import (
-	"bytes"
-)
-
+// A Quote is a [Block] representing a [block quote].
+//
+// [block quote]: https://spec.commonmark.org/0.31.2/#block-quotes
 type Quote struct {
 	Position
-	Blocks []Block
+	Blocks []Block // content of quote
 }
 
-func (b *Quote) PrintHTML(buf *bytes.Buffer) {
-	buf.WriteString("<blockquote>\n")
+func (*Quote) Block() {}
+
+func (b *Quote) printHTML(p *printer) {
+	p.html("<blockquote>\n")
 	for _, c := range b.Blocks {
-		c.PrintHTML(buf)
+		c.printHTML(p)
 	}
-	buf.WriteString("</blockquote>\n")
+	p.html("</blockquote>\n")
 }
 
-func (b *Quote) printMarkdown(buf *markOut, s mdState) {
-	buf.maybeQuoteNL('>')
-	buf.WriteString("> ")
-	defer buf.pop(buf.push("> "))
-	printMarkdownBlocks(b.Blocks, buf, s)
+func (b *Quote) printMarkdown(p *printer) {
+	p.maybeQuoteNL('>')
+	p.WriteString("> ")
+	defer p.pop(p.push("> "))
+	printMarkdownBlocks(b.Blocks, p)
+}
+
+// A quoteBuildier is a [blockBuilder] for a block quote.
+type quoteBuilder struct{}
+
+// startBlockQuote is a [starter] for a [Quote].
+func startBlockQuote(p *parser, s line) (line, bool) {
+	line, ok := trimQuote(s)
+	if !ok {
+		return s, false
+	}
+	p.addBlock(new(quoteBuilder))
+	return line, true
 }
 
 func trimQuote(s line) (line, bool) {
@@ -38,20 +52,10 @@ func trimQuote(s line) (line, bool) {
 	return t, true
 }
 
-type quoteBuilder struct{}
-
-func newQuote(p *parseState, s line) (line, bool) {
-	if line, ok := trimQuote(s); ok {
-		p.addBlock(new(quoteBuilder))
-		return line, true
-	}
-	return s, false
-}
-
-func (b *quoteBuilder) extend(p *parseState, s line) (line, bool) {
+func (b *quoteBuilder) extend(p *parser, s line) (line, bool) {
 	return trimQuote(s)
 }
 
-func (b *quoteBuilder) build(p buildState) Block {
+func (b *quoteBuilder) build(p *parser) Block {
 	return &Quote{p.pos(), p.blocks()}
 }

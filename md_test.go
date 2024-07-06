@@ -383,7 +383,7 @@ func findUnexported(v reflect.Value) (reflect.Value, bool) {
 var (
 	blockType   = reflect.TypeOf(new(Block)).Elem()
 	blocksType  = reflect.TypeOf(new([]Block)).Elem()
-	inlinesType = reflect.TypeOf(new([]Inline)).Elem()
+	inlinesType = reflect.TypeOf(new(Inlines)).Elem()
 )
 
 func printb(buf *bytes.Buffer, b Block, prefix string) {
@@ -400,7 +400,7 @@ func printb(buf *bytes.Buffer, b Block, prefix string) {
 			continue
 		}
 		if tf.Type == inlinesType {
-			printis(buf, v.Field(i).Interface().([]Inline))
+			printis(buf, v.Field(i).Interface().(Inlines))
 		} else if tf.Type.Kind() == reflect.Slice && tf.Type.Elem().Kind() == reflect.String {
 			fmt.Fprintf(buf, " %s:%q", tf.Name, v.Field(i))
 		} else if tf.Type != blocksType && !tf.Type.Implements(blockType) && tf.Type.Kind() != reflect.Slice {
@@ -448,13 +448,17 @@ func printslice(buf *bytes.Buffer, v reflect.Value, prefix string) {
 func printi(buf *bytes.Buffer, in Inline) {
 	fmt.Fprintf(buf, "%T(", in)
 	v := reflect.ValueOf(in).Elem()
+	label := v.FieldByName("Label")
+	if label.IsValid() {
+		fmt.Fprintf(buf, "%q", label)
+	}
 	text := v.FieldByName("Text")
 	if text.IsValid() {
 		fmt.Fprintf(buf, "%q", text)
 	}
 	inner := v.FieldByName("Inner")
 	if inner.IsValid() {
-		printis(buf, inner.Interface().([]Inline))
+		printis(buf, inner.Interface().(Inlines))
 	}
 	buf.WriteString(")")
 }

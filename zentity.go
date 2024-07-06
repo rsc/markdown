@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:generate go run entity2go.go -o entity.go
+//go:generate go run entity2go.go -o zentity.go
 
 package markdown
 

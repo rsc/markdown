@@ -5,199 +5,177 @@
 package markdown
 
 import (
-	"bytes"
 	"fmt"
+	"strconv"
 )
 
+// TODO should Item implement Block?
+// maybe make a itemBlock internal Block for use with the builders?
+
+// A List is a [Block] representing a [list],
+// either an unordered (bullet) list
+// or an ordered (numbered) list.
+//
+// Lists can be [loose or tight], which controls the spacing between list items.
+// In Markdown, a list is loose when there is a blank line
+// between any two list items, or when any list item
+// directly contains two blocks that are separated by a blank line.
+// (Note that because paragraphs must be separated by blank lines,
+// any multi-paragraph item necessarily creates a loose list.)
+// When rendering HTML, loose list items are formatted in the usual way.
+// For tight lists, a list item consisting of a single paragraph omits
+// the <p>...</p> tags around the paragraph text.
+//
+// [list]: https://spec.commonmark.org/0.31.2/#lists
+// [loose or tight]: https://spec.commonmark.org/0.31.2/#loose
 type List struct {
 	Position
+
+	// Bullet is the bullet character used in the list: '-', '+', or '*'.
+	// For an ordered list, Bullet is the character following the number: '.' or ')'.
 	Bullet rune
-	Start  int
-	Loose  bool
-	Items  []Block // always *Item
+
+	// Start is the number of the first item in an ordered list.
+	Start int
+
+	// Loose indicates whether the list is loose.
+	// (See the [List] doc comment for details.)
+	Loose bool
+
+	// Items is the list's items.
+	// TODO: Should this be []*Item or Blocks?
+	Items []Block // always *Item
 }
 
+func (*List) Block() {}
+
+// Ordered reports whether the list is ordered (numbered).
+func (l *List) Ordered() bool {
+	return l.Bullet == '.' || l.Bullet == ')'
+}
+
+// An Item is a [Block] representing a [list item].
+//
+// [list item]: https://spec.commonmark.org/0.31.2/#list-items
 type Item struct {
 	Position
+
+	// Blocks is the item content.
 	Blocks []Block
 }
 
-func (b *List) PrintHTML(buf *bytes.Buffer) {
+func (*Item) Block() {}
+
+func (b *List) printHTML(p *printer) {
 	if b.Bullet == '.' || b.Bullet == ')' {
-		buf.WriteString("<ol")
+		p.html("<ol")
 		if b.Start != 1 {
-			fmt.Fprintf(buf, " start=\"%d\"", b.Start)
+			p.html(` start="`, strconv.Itoa(b.Start), `"`)
 		}
-		buf.WriteString(">\n")
+		p.html(">\n")
 	} else {
-		buf.WriteString("<ul>\n")
+		p.html("<ul>\n")
 	}
-	for _, c := range b.Items {
-		c.PrintHTML(buf)
+	for _, item := range b.Items {
+		item.printHTML(p)
 	}
 	if b.Bullet == '.' || b.Bullet == ')' {
-		buf.WriteString("</ol>\n")
+		p.html("</ol>\n")
 	} else {
-		buf.WriteString("</ul>\n")
+		p.html("</ul>\n")
 	}
 }
 
-func (b *List) printMarkdown(buf *markOut, s mdState) {
-	buf.maybeNL()
-	s.bullet = b.Bullet
-	s.num = b.Start
-	if b.Loose {
-		buf.loose++
-	} else {
-		buf.tight++
+func (b *Item) printHTML(p *printer) {
+	p.html("<li>")
+	if len(b.Blocks) > 0 {
+		if _, ok := b.Blocks[0].(*Text); !ok {
+			p.WriteString("\n")
+		}
 	}
-	for i, item := range b.Items {
-		if i > 0 {
-			buf.NL()
-			if b.Loose {
-				buf.NL()
+	for i, c := range b.Blocks {
+		c.printHTML(p)
+		if i+1 < len(b.Blocks) {
+			if _, ok := c.(*Text); ok {
+				p.WriteString("\n")
 			}
 		}
-		item.printMarkdown(buf, s)
-		s.num++
 	}
+	p.html("</li>\n")
+}
+
+func (b *List) printMarkdown(p *printer) {
+	old := p.listOut
+	defer func() {
+		p.listOut = old
+	}()
+	p.bullet = b.Bullet
+	p.num = b.Start
 	if b.Loose {
-		buf.loose--
+		p.loose++
 	} else {
-		buf.tight--
+		p.tight++
+	}
+	p.maybeNL()
+	for i, item := range b.Items {
+		if i > 0 {
+			p.nl()
+			if b.Loose {
+				p.nl()
+			}
+		}
+		item.printMarkdown(p)
+		p.num++
 	}
 }
 
-func (b *Item) printMarkdown(buf *markOut, s mdState) {
+func (b *Item) printMarkdown(p *printer) {
 	var marker string
-	if s.bullet == '.' || s.bullet == ')' {
-		marker = fmt.Sprintf(" %d%c ", s.num, s.bullet)
+	if p.bullet == '.' || p.bullet == ')' {
+		marker = fmt.Sprintf(" %d%c ", p.num, p.bullet)
 	} else {
-		marker = fmt.Sprintf("  %c ", s.bullet)
+		marker = fmt.Sprintf("  %c ", p.bullet)
 	}
-	buf.WriteString(marker)
+	p.WriteString(marker)
 	n := len(marker)
 	if n > 4 {
 		n = 4
 	}
-	defer buf.pop(buf.push("    "[:n]))
-	printMarkdownBlocks(b.Blocks, buf, s)
+	defer p.pop(p.push("    "[:n]))
+	printMarkdownBlocks(b.Blocks, p)
 }
 
-func (b *Item) PrintHTML(buf *bytes.Buffer) {
-	buf.WriteString("<li>")
-	if len(b.Blocks) > 0 {
-		if _, ok := b.Blocks[0].(*Text); !ok {
-			buf.WriteString("\n")
-		}
-	}
-	for i, c := range b.Blocks {
-		c.PrintHTML(buf)
-		if i+1 < len(b.Blocks) {
-			if _, ok := c.(*Text); ok {
-				buf.WriteString("\n")
-			}
-		}
-	}
-	buf.WriteString("</li>\n")
-}
-
+// A listBuilder is a [blockBuilder] for a [List].
 type listBuilder struct {
+	// List fields
 	bullet rune
-	num    int
-	loose  bool
-	item   *itemBuilder
-	todo   func() line
+	start  int
+
+	// item is the builder for the current item.
+	item *itemBuilder
+
+	//
+	todo func() line
 }
 
-func (b *listBuilder) build(p buildState) Block {
-	blocks := p.blocks()
-	pos := p.pos()
-
-	// list can have wrong pos b/c extend dance.
-	pos.EndLine = blocks[len(blocks)-1].Pos().EndLine
-Loose:
-	for i, c := range blocks {
-		c := c.(*Item)
-		if i+1 < len(blocks) {
-			if blocks[i+1].Pos().StartLine-c.EndLine > 1 {
-				b.loose = true
-				break Loose
-			}
-		}
-		for j, d := range c.Blocks {
-			endLine := d.Pos().EndLine
-			if j+1 < len(c.Blocks) {
-				if c.Blocks[j+1].Pos().StartLine-endLine > 1 {
-					b.loose = true
-					break Loose
-				}
-			}
-		}
-	}
-
-	if !b.loose {
-		for _, c := range blocks {
-			c := c.(*Item)
-			for i, d := range c.Blocks {
-				if p, ok := d.(*Paragraph); ok {
-					c.Blocks[i] = p.Text
-				}
-			}
-		}
-	}
-
-	return &List{
-		pos,
-		b.bullet,
-		b.num,
-		b.loose,
-		p.blocks(),
-	}
+// An itemBuilder is a [blockBuilder] for an [Item].
+type itemBuilder struct {
+	list        *listBuilder //  list containing item
+	width       int          // TODO
+	haveContent bool         // TODO
 }
 
-func (b *itemBuilder) build(p buildState) Block {
-	b.list.item = nil
-	return &Item{p.pos(), p.blocks()}
-}
-
-func (c *listBuilder) extend(p *parseState, s line) (line, bool) {
-	d := c.item
-	if d != nil && s.trimSpace(d.width, d.width, true) || d == nil && s.isBlank() {
-		return s, true
-	}
-	return s, false
-}
-
-func (c *itemBuilder) extend(p *parseState, s line) (line, bool) {
-	if s.isBlank() && !c.haveContent {
-		return s, false
-	}
-	if s.isBlank() {
-		// Goldmark does this and apparently commonmark.js too.
-		// Not sure why it is necessary.
-		return line{}, true
-	}
-	if !s.isBlank() {
-		c.haveContent = true
-	}
-	return s, true
-}
-
-func newListItem(p *parseState, s line) (line, bool) {
+// TODO explain
+// startListItem is a [starter] for a list item.
+// The first list item in a list also starts the list itself.
+func startListItem(p *parser, s line) (_ line, _ bool) {
 	if list, ok := p.curB().(*listBuilder); ok && list.todo != nil {
 		s = list.todo()
 		list.todo = nil
 		return s, true
 	}
-	if p.startListItem(&s) {
-		return s, true
-	}
-	return s, false
-}
 
-func (p *parseState) startListItem(s *line) bool {
-	t := *s
+	t := s
 	n := 0
 	for i := 0; i < 3; i++ {
 		if !t.trimSpace(1, 1, false) {
@@ -210,14 +188,14 @@ func (p *parseState) startListItem(s *line) bool {
 Switch:
 	switch bullet {
 	default:
-		return false
+		return
 	case '-', '*', '+':
 		t.trim(bullet)
 		n++
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		for j := t.i; ; j++ {
 			if j >= len(t.text) {
-				return false
+				return
 			}
 			c := t.text[j]
 			if c == '.' || c == ')' {
@@ -229,17 +207,17 @@ Switch:
 				break Switch
 			}
 			if c < '0' || '9' < c {
-				return false
+				return
 			}
 			if j-t.i >= 9 {
-				return false
+				return
 			}
 			num = num*10 + int(c) - '0'
 		}
 
 	}
 	if !t.trimSpace(1, 1, true) {
-		return false
+		return
 	}
 	n++
 	tt := t
@@ -252,7 +230,7 @@ Switch:
 		t = tt
 	}
 
-	// point of no return
+	// Pretty sure we have a list item now.
 
 	var list *listBuilder
 	if c, ok := p.nextB().(*listBuilder); ok {
@@ -271,9 +249,9 @@ Switch:
 			// is inside a block quote.
 			// See testdata/extra.txt 117.md.
 			p.corner = true
-			return false
+			return
 		}
-		list = &listBuilder{bullet: rune(bullet), num: num}
+		list = &listBuilder{bullet: rune(bullet), start: num}
 		p.addBlock(list)
 	}
 	b := &itemBuilder{list: list, width: n, haveContent: !t.isBlank()}
@@ -282,12 +260,175 @@ Switch:
 		list.item = b
 		return t
 	}
-	return true
+
+	// TODO explain s not t
+	return s, true
+}
+
+func (c *listBuilder) extend(p *parser, s line) (line, bool) {
+	// TODO explain
+	item := c.item
+	if item == nil && s.isBlank() { // TODO how can this happen
+		return s, true
+	}
+
+	// If we can trim the indentation required by the current item,
+	// do that and return true, allowing s to be passed to the
+	// item builder.
+	if item != nil && s.trimSpace(item.width, item.width, true) {
+		return s, true
+	}
+	return s, false
+}
+
+func (c *itemBuilder) extend(p *parser, s line) (line, bool) {
+	blank := s.isBlank()
+
+	// If there is a blank line and no content so far,
+	// the item is over. TODO explain
+	if blank && !c.haveContent {
+		return s, false
+	}
+
+	// TODO explain
+	if blank {
+		// Goldmark does this and apparently commonmark.js too.
+		// Not sure why it is necessary.
+		return line{}, true
+	}
+
+	// TODO explain
+	if !blank {
+		c.haveContent = true
+	}
+	return s, true
+}
+
+func (b *itemBuilder) build(p *parser) Block {
+	b.list.item = nil
+	return &Item{p.pos(), p.blocks()}
+}
+
+func (b *listBuilder) build(p *parser) Block {
+	blocks := p.blocks()
+	pos := p.pos()
+
+	// list can have wrong pos b/c extend dance.
+	// TODO explain
+	pos.EndLine = blocks[len(blocks)-1].Pos().EndLine
+
+	// Decide whether list is loose.
+	loose := false
+Loose:
+	for i, c := range blocks {
+		c := c.(*Item)
+		if i+1 < len(blocks) {
+			if blocks[i+1].Pos().StartLine-c.EndLine > 1 {
+				loose = true
+				break Loose
+			}
+		}
+		for j, d := range c.Blocks {
+			endLine := d.Pos().EndLine
+			if j+1 < len(c.Blocks) {
+				if c.Blocks[j+1].Pos().StartLine-endLine > 1 {
+					loose = true
+					break Loose
+				}
+			}
+		}
+	}
+
+	if !loose {
+		// TODO: rethink whether this is correct.
+		// Perhaps the blocks should still be Paragraph
+		// and we just skip over the <p> during formatting?
+		// Then Text might not need to be a Block.
+		for _, c := range blocks {
+			c := c.(*Item)
+			for i, d := range c.Blocks {
+				if p, ok := d.(*Paragraph); ok {
+					c.Blocks[i] = p.Text
+				}
+			}
+		}
+	}
+
+	x := &List{
+		pos,
+		b.bullet,
+		b.start,
+		loose,
+		p.blocks(),
+	}
+	listCorner(p, x)
+	if p.TaskList {
+		p.addFixup(func() {
+			parseTaskList(p, x)
+		})
+	}
+	return x
+}
+
+// listCorner checks whether list contains any corner cases
+// that other implementations mishandle, and if so sets p.corner.
+func listCorner(p *parser, list *List) {
+	for _, item := range list.Items {
+		item := item.(*Item)
+		if len(item.Blocks) == 0 {
+			// Goldmark mishandles what follows; see testdata/extra.txt 111.md.
+			p.corner = true
+			return
+		}
+		switch item.Blocks[0].(type) {
+		case *List, *ThematicBreak, *CodeBlock:
+			// Goldmark mishandles a list with various block items inside it.
+			p.corner = true
+			return
+		}
+	}
 }
 
 // GitHub task list extension
 
-func (p *parseState) taskList(list *List) {
+// A Task is an [Inline] for a [task list item marker] (a checkbox),
+// a GitHub-flavored Markdown extension.
+//
+// [task list item marker]: https://github.github.com/gfm/#task-list-items-extension-
+type Task struct {
+	Checked bool
+}
+
+func (*Task) Inline() {}
+
+func (x *Task) printHTML(p *printer) {
+	p.html("<input ")
+	if x.Checked {
+		p.html(`checked="" `)
+	}
+	p.html(`disabled="" type="checkbox"> `)
+}
+
+func (x *Task) printMarkdown(p *printer) {
+	if x.Checked {
+		p.text(`[x] `)
+	} else {
+		p.text(`[ ] `)
+	}
+}
+
+func (x *Task) printText(p *printer) {
+	// Unreachable: printText is only used to render the
+	// alt text of an image, which can only contain inlines,
+	// and while Task is an inline, it only appears inside
+	// lists, and a list cannot appear in an alt text.
+	// Even so, maybe someone will make malformed syntax trees.
+	x.printMarkdown(p)
+}
+
+// taskList checks whether any items in list begin with task list markers.
+// If so, it replaces the markers with [Task]s.
+func parseTaskList(p *parser, list *List) {
 	for _, item := range list.Items {
 		item := item.(*Item)
 		if len(item.Blocks) == 0 {
@@ -321,58 +462,4 @@ func (p *parseState) taskList(list *List) {
 		text.Inline = append([]Inline{&Task{Checked: s[1] == 'x' || s[1] == 'X'},
 			&Plain{Text: s[len("[x] "):]}}, text.Inline[1:]...)
 	}
-}
-
-type Task struct {
-	Checked bool
-}
-
-func (x *Task) Inline() {
-}
-
-func (x *Task) PrintHTML(buf *bytes.Buffer) {
-	buf.WriteString("<input ")
-	if x.Checked {
-		buf.WriteString(`checked="" `)
-	}
-	buf.WriteString(`disabled="" type="checkbox"> `)
-}
-
-func (x *Task) printMarkdown(buf *markOut) {
-	// TODO share with printText
-	buf.WriteByte('[')
-	if x.Checked {
-		buf.WriteByte('x')
-	} else {
-		buf.WriteByte(' ')
-	}
-	buf.WriteByte(']')
-	buf.WriteByte(' ')
-}
-
-func (x *Task) PrintText(buf *bytes.Buffer) {
-	buf.WriteByte('[')
-	if x.Checked {
-		buf.WriteByte('x')
-	} else {
-		buf.WriteByte(' ')
-	}
-	buf.WriteByte(']')
-	buf.WriteByte(' ')
-}
-
-func listCorner(list *List) bool {
-	for _, item := range list.Items {
-		item := item.(*Item)
-		if len(item.Blocks) == 0 {
-			// Goldmark mishandles what follows; see testdata/extra.txt 111.md.
-			return true
-		}
-		switch item.Blocks[0].(type) {
-		case *List, *ThematicBreak, *CodeBlock:
-			// Goldmark mishandles a list with various block items inside it.
-			return true
-		}
-	}
-	return false
 }
