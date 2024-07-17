@@ -329,25 +329,20 @@ func (p *Parser) parse(text string) (d *Document, corner bool) {
 	ps.lineDepth = -1
 	ps.addBlock(&rootBuilder{})
 	for text != "" {
-		var ln string
-		i := strings.Index(text, "\n")
-		j := strings.Index(text, "\r")
-		var nl byte
+		end := 0
+		for end < len(text) && text[end] != '\n' && text[end] != '\r' {
+			end++
+		}
+		ln := text[:end]
+		text = text[end:]
+		nl := byte(0)
 		switch {
-		case j >= 0 && (i < 0 || j < i): // have \r, maybe \r\n
-			ln = text[:j]
-			if i == j+1 {
-				text = text[j+2:]
-				nl = '\r' + '\n'
-			} else {
-				text = text[j+1:]
-				nl = '\r'
-			}
-		case i >= 0:
-			ln, text = text[:i], text[i+1:]
-			nl = '\n'
-		default:
-			ln, text = text, ""
+		case len(text) >= 2 && text[0] == '\r' && text[1] == '\n':
+			nl = '\r' + '\n'
+			text = text[2:]
+		case len(text) >= 1:
+			nl = text[0]
+			text = text[1:]
 		}
 		ps.lineno++
 		ps.addLine(line{text: ln, nl: nl})
