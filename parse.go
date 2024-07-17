@@ -93,6 +93,8 @@ type parser struct {
 	// texts to apply inline processing to
 	texts []textRaw
 
+	footnotes map[string]*Footnote
+
 	// inline parsing
 	s       string
 	emitted int // s[:emitted] has been emitted into list
@@ -343,4 +345,5 @@ var starters = []starter{
 	startThematicBreak,
 	startListItem,
 	startHTMLBlock,
+	startFootnote,
 }

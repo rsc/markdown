@@ -136,6 +136,11 @@ func (x *Image) printText(p *printer) {
 // parseLinkOpen is an [inlineParser] for a link open [.
 // The caller has checked that s[start] == '['.
 func parseLinkOpen(p *parser, s string, start int) (x Inline, end int, ok bool) {
+	if p.Footnote {
+		if x, end, ok := parseFootnoteRef(p, s, start); ok {
+			return x, end, ok
+		}
+	}
 	return &openPlain{Plain{s[start : start+1]}, start + 1}, start + 1, true
 }
 

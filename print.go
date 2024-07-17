@@ -20,6 +20,8 @@ type printer struct {
 	prefixOlder []byte
 	trimLimit   int
 	listOut
+	footnotes    map[*Footnote]*printedNote
+	footnotelist []*printedNote
 }
 
 type listOut struct {
@@ -83,12 +85,14 @@ func ToHTML(b Block) string {
 	var p printer
 	p.writeMode = writeHTML
 	b.printHTML(&p)
+	printFootnoteHTML(&p)
 	return p.buf.String()
 }
 
 func Format(b Block) string {
 	var p printer
 	b.printMarkdown(&p)
+	printFootnoteMarkdown(&p)
 	// TODO footnotes?
 	return p.buf.String()
 }

@@ -100,6 +100,13 @@ func (s *line) trim(c byte) bool {
 	return false
 }
 
+func (s *line) skip(n int) {
+	s.i += n
+	if s.nonblank < s.i {
+		s.setNonblank()
+	}
+}
+
 func (s *line) string() string {
 	switch s.spaces {
 	case 0:
