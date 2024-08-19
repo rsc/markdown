@@ -219,8 +219,8 @@ func parseLinkClose(p *parser, s string, start int, open *openPlain) (*Link, int
 			if !ok {
 				break
 			}
-			if link, ok := p.links[normalizeLabel(label)]; ok {
-				fmt.Println("label:", label)
+			label = normalizeLabel(label)
+			if link, ok := p.links[label]; ok {
 				return &Link{URL: link.URL, Title: link.Title, Label: label, RefStyle: Full}, i, true
 			}
 			// Note: Could break here, but CommonMark dingus does not
@@ -238,8 +238,8 @@ func parseLinkClose(p *parser, s string, start int, open *openPlain) (*Link, int
 		refStyle = Collpased
 	}
 
-	label := s[open.i:i]
-	if link, ok := p.links[normalizeLabel(label)]; ok {
+	label := normalizeLabel(s[open.i:i])
+	if link, ok := p.links[label]; ok {
 		return &Link{URL: link.URL, Title: link.Title, Label: label, RefStyle: refStyle}, end, true
 	}
 	return nil, 0, false
@@ -426,13 +426,13 @@ func parseLinkLabel(p *parser, s string, i int) (string, int, bool) {
 
 // normalizeLabel returns the normalized label for s, for uniquely identifying that label.
 func normalizeLabel(s string) string {
-	if strings.Contains(s, "[") || strings.Contains(s, "]") {
-		// Labels cannot have [ ] so avoid the work of translating.
-		// This is especially important for pathlogical cases like
-		// [[[[[[[[[[a]]]]]]]]]] which would otherwise generate quadratic
-		// amounts of garbage.
-		return ""
-	}
+	// if strings.Contains(s, "[") || strings.Contains(s, "]") {
+	// 	// Labels cannot have [ ] so avoid the work of translating.
+	// 	// This is especially important for pathlogical cases like
+	// 	// [[[[[[[[[[a]]]]]]]]]] which would otherwise generate quadratic
+	// 	// amounts of garbage.
+	// 	return ""
+	// }
 
 	// “To normalize a label, strip off the opening and closing brackets,
 	// perform the Unicode case fold, strip leading and trailing spaces, tabs, and line endings,

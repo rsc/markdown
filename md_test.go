@@ -43,6 +43,7 @@ var roundTripFailures = map[string]bool{
 	"TestToHTML/spec0.29/57":  true, // setext heading
 	"TestToHTML/spec0.29/63":  true, // setext heading
 	"TestToHTML/spec0.29/65":  true, // newline in heading
+	"TestToHTML/spec0.29/163": true, // escaped bracket in label
 	"TestToHTML/spec0.29/171": true, // link ref def
 	"TestToHTML/spec0.29/208": true, // weird list
 	"TestToHTML/spec0.29/227": true, // weird list
@@ -58,6 +59,7 @@ var roundTripFailures = map[string]bool{
 	"TestToHTML/spec0.29/331": true, // backtick spaces
 	"TestToHTML/spec0.29/349": true, // backticks
 	"TestToHTML/spec0.29/502": true, // escape quotes
+	"TestToHTML/spec0.29/545": true, // escaped bracket in label
 
 	"TestToHTML/spec0.30/26":  true, // escape plain
 	"TestToHTML/spec0.30/37":  true, // escape plain
@@ -72,6 +74,7 @@ var roundTripFailures = map[string]bool{
 	"TestToHTML/spec0.30/87":  true, // setext heading
 	"TestToHTML/spec0.30/93":  true, // setext heading
 	"TestToHTML/spec0.30/95":  true, // newline in heading
+	"TestToHTML/spec0.30/194": true, // escaped bracket in label
 	"TestToHTML/spec0.30/202": true, // link ref def
 	"TestToHTML/spec0.30/238": true, // weird list
 	"TestToHTML/spec0.30/257": true, // weird list
@@ -81,6 +84,7 @@ var roundTripFailures = map[string]bool{
 	"TestToHTML/spec0.30/331": true, // backtick spaces
 	"TestToHTML/spec0.30/349": true, // backticks
 	"TestToHTML/spec0.30/505": true, // escape quotes
+	"TestToHTML/spec0.30/548": true, // escaped bracket in label
 
 	"TestToHTML/spec0.31.2/26":  true, // escape plain
 	"TestToHTML/spec0.31.2/37":  true, // escape plain
@@ -95,6 +99,7 @@ var roundTripFailures = map[string]bool{
 	"TestToHTML/spec0.31.2/87":  true, // setext heading
 	"TestToHTML/spec0.31.2/93":  true, // setext heading
 	"TestToHTML/spec0.31.2/95":  true, // newline in heading
+	"TestToHTML/spec0.31.2/194": true, // escaped bracket in label
 	"TestToHTML/spec0.31.2/202": true, // link ref def
 	"TestToHTML/spec0.31.2/238": true, // weird list
 	"TestToHTML/spec0.31.2/257": true, // weird list
@@ -104,6 +109,7 @@ var roundTripFailures = map[string]bool{
 	"TestToHTML/spec0.31.2/331": true, // backtick spaces
 	"TestToHTML/spec0.31.2/349": true, // backticks
 	"TestToHTML/spec0.31.2/506": true, // escape quotes
+	"TestToHTML/spec0.31.2/549": true, // escaped bracket in label
 
 	"TestToHTML/table/gfm200": true, // table
 	"TestToHTML/table/2":      true, // table

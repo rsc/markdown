@@ -38,14 +38,14 @@ A document.
 [r2]: u2 "title2"
 [r3]: u3 'title3'
 -- reflink-full --
-[Foo bar][Baz]
+[Foo bar][baz]
 
-[Baz]: u1
+[baz]: u1
 -- reflink-collapsed --
 [Foo bar][]
 
-[Foo bar]: u1
+[foo bar]: u1
 -- reflink-shortcut --
 [Foo bar]
 
-[Foo bar]: u1
+[foo bar]: u1
