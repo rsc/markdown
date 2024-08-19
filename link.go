@@ -68,7 +68,6 @@ func (x *Link) printHTML(p *printer) {
 }
 
 func (x *Link) printMarkdown(p *printer) {
-	fmt.Printf("%+v\n", x)
 	p.WriteByte('[')
 	for _, c := range x.Inner {
 		c.printMarkdown(p)
@@ -240,7 +239,6 @@ func parseLinkClose(p *parser, s string, start int, open *openPlain) (*Link, int
 	}
 
 	label := normalizeLabel(s[open.i:i])
-	fmt.Printf("s:%q, label:%q\n", s, label)
 	if link, ok := p.links[label]; ok {
 		return &Link{URL: link.URL, Title: link.Title, Label: label, RefStyle: refStyle}, end, true
 	}

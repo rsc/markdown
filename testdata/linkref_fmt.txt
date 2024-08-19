@@ -37,3 +37,15 @@ A document.
 [r1]: u1 (title1)
 [r2]: u2 "title2"
 [r3]: u3 'title3'
+-- reflink-full --
+[full][full]
+
+[full]: u1
+-- reflink-collapsed --
+[collapsed][]
+
+[collapsed]: u1
+-- reflink-shortcut --
+[shortcut]
+
+[shortcut]: u1
