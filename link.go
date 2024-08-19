@@ -219,8 +219,8 @@ func parseLinkClose(p *parser, s string, start int, open *openPlain) (*Link, int
 			if !ok {
 				break
 			}
-			label = normalizeLabel(label)
-			if link, ok := p.links[label]; ok {
+			if link, ok := p.links[normalizeLabel(label)]; ok {
+				fmt.Println("label:", label)
 				return &Link{URL: link.URL, Title: link.Title, Label: label, RefStyle: Full}, i, true
 			}
 			// Note: Could break here, but CommonMark dingus does not
@@ -238,8 +238,8 @@ func parseLinkClose(p *parser, s string, start int, open *openPlain) (*Link, int
 		refStyle = Collpased
 	}
 
-	label := normalizeLabel(s[open.i:i])
-	if link, ok := p.links[label]; ok {
+	label := s[open.i:i]
+	if link, ok := p.links[normalizeLabel(label)]; ok {
 		return &Link{URL: link.URL, Title: link.Title, Label: label, RefStyle: refStyle}, end, true
 	}
 	return nil, 0, false
