@@ -13,6 +13,15 @@ import (
 	"golang.org/x/text/cases"
 )
 
+type RefStyle int
+
+const (
+	NoRef RefStyle = iota
+	Full
+	Collpased
+	Shortcut
+)
+
 // Note: Link and Image are the same underlying struct by design,
 // so that code can safely convert between *Link and *Image.
 
@@ -24,6 +33,9 @@ type Link struct {
 	URL       string
 	Title     string
 	TitleChar byte // ', " or )
+
+	Label    string
+	RefStyle RefStyle
 }
 
 // An Image is an [Inline] representing an [image] (<a> tag).
@@ -34,6 +46,9 @@ type Image struct {
 	URL       string
 	Title     string
 	TitleChar byte
+
+	Label    string
+	RefStyle RefStyle
 }
 
 func (*Link) Inline() {}
@@ -53,18 +68,30 @@ func (x *Link) printHTML(p *printer) {
 }
 
 func (x *Link) printMarkdown(p *printer) {
+	fmt.Printf("%+v\n", x)
 	p.WriteByte('[')
 	for _, c := range x.Inner {
 		c.printMarkdown(p)
 	}
-	p.WriteString("](")
-	u := mdLinkEscaper.Replace(x.URL)
-	if u == "" || strings.ContainsAny(u, " ") {
-		u = "<" + u + ">"
+	p.WriteByte(']')
+	switch x.RefStyle {
+	case NoRef:
+		p.WriteByte('(')
+		u := mdLinkEscaper.Replace(x.URL)
+		if u == "" || strings.ContainsAny(u, " ") {
+			u = "<" + u + ">"
+		}
+		p.WriteString(u)
+		printLinkTitleMarkdown(p, x.Title, x.TitleChar)
+		p.WriteByte(')')
+	case Full:
+		p.WriteByte('[')
+		p.WriteString(x.Label)
+		p.WriteByte(']')
+	case Collpased:
+		p.WriteString("[]")
+	case Shortcut:
 	}
-	p.WriteString(u)
-	printLinkTitleMarkdown(p, x.Title, x.TitleChar)
-	p.WriteByte(')')
 }
 
 func printLinkTitleMarkdown(p *printer, title string, titleChar byte) {
@@ -193,8 +220,9 @@ func parseLinkClose(p *parser, s string, start int, open *openPlain) (*Link, int
 			if !ok {
 				break
 			}
-			if link, ok := p.links[normalizeLabel(label)]; ok {
-				return &Link{URL: link.URL, Title: link.Title}, i, true
+			label = normalizeLabel(label)
+			if link, ok := p.links[label]; ok {
+				return &Link{URL: link.URL, Title: link.Title, Label: label, RefStyle: Full}, i, true
 			}
 			// Note: Could break here, but CommonMark dingus does not
 			// fall back to trying Text for [Text][Label] when Label is unknown.
@@ -205,12 +233,16 @@ func parseLinkClose(p *parser, s string, start int, open *openPlain) (*Link, int
 
 	// Collapsed or shortcut reference link: [Text][] or [Text].
 	end := i + 1
+	refStyle := Shortcut
 	if strings.HasPrefix(s[end:], "[]") {
 		end += 2
+		refStyle = Collpased
 	}
 
-	if link, ok := p.links[normalizeLabel(s[open.i:i])]; ok {
-		return &Link{URL: link.URL, Title: link.Title}, end, true
+	label := normalizeLabel(s[open.i:i])
+	fmt.Printf("s:%q, label:%q\n", s, label)
+	if link, ok := p.links[label]; ok {
+		return &Link{URL: link.URL, Title: link.Title, Label: label, RefStyle: refStyle}, end, true
 	}
 	return nil, 0, false
 }
