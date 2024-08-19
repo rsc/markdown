@@ -426,13 +426,13 @@ func parseLinkLabel(p *parser, s string, i int) (string, int, bool) {
 
 // normalizeLabel returns the normalized label for s, for uniquely identifying that label.
 func normalizeLabel(s string) string {
-	// if strings.Contains(s, "[") || strings.Contains(s, "]") {
-	// 	// Labels cannot have [ ] so avoid the work of translating.
-	// 	// This is especially important for pathlogical cases like
-	// 	// [[[[[[[[[[a]]]]]]]]]] which would otherwise generate quadratic
-	// 	// amounts of garbage.
-	// 	return ""
-	// }
+	if strings.Contains(s, "[") || strings.Contains(s, "]") {
+		// Labels cannot have [ ] so avoid the work of translating.
+		// This is especially important for pathlogical cases like
+		// [[[[[[[[[[a]]]]]]]]]] which would otherwise generate quadratic
+		// amounts of garbage.
+		return ""
+	}
 
 	// “To normalize a label, strip off the opening and closing brackets,
 	// perform the Unicode case fold, strip leading and trailing spaces, tabs, and line endings,
